@@ -122,7 +122,7 @@ class sudoku_game:
 
 
 # The purpose of this class is to create an individual sudoku puzzle, to which the genetic algorithm will be applied
-class individual:
+class Individual:
     """
     A class to represent a sudoku puzzle
     """
@@ -167,6 +167,23 @@ class individual:
         np.putmask(flat_board, flat_board == 0, fill_numbers)
         self.board = flat_board.reshape(self.N, self.N)
 
+    def remove_numbers(self, removed_numbers : int = 20):
+        # Pick two numbers from 0 to self.N to remove
+
+        # Check if we can still do an iteration
+        if sum(np.where(self.board == 0)) < removed_numbers - 1:
+            removed_numbers(self, removed_numbers)
+
+
+    def is_unique(self):
+        """
+        Function used to check if a solution is unique 
+        """
+
+        pass
+        
+
+
 
     # ------------------------- Get functions --------------------------------------------------
 
@@ -184,7 +201,7 @@ class individual:
             for i in range(swap_number):
                 # Randomly select two swappeable positions 
                 neighbour[self.swappable_positions[2*i]], neighbour[self.swappable_positions[2*i+1]] = neighbour[self.swappable_positions[2*i+1]], neighbour[self.swappable_positions[2*i]]
-            neighbour_individual = individual(self.initial_board, neighbour)
+            neighbour_individual = Individual(self.initial_board, neighbour)
             neighbours.append(neighbour_individual)
         return neighbours
 
@@ -278,12 +295,68 @@ class individual:
 
     # [TO DO] -------------------------------------------------------------------------------------
 
-    def mutate(self):
+    def mutate(self, mutation_rate : float = 0.1):
         """
-        Function to mutate the individual
+        Function to mutate the individual, i.e. change the board randomly
         """
         pass
 
+
+
+# Handle this TODO !!!!
+class Population:
+    """
+    A class to represent a population of sudoku puzzles
+    """
+    def __init__(self, size, **kwargs):
+        # population size
+        self.size = size
+        self.individuals = []
+
+        # appending the population with individuals
+        for _ in range(size):
+            self.individuals.append(Individual())
+
+    def __len__(self):
+        return len(self.individuals)
+
+    def __getitem__(self, position):
+        return self.individuals[position]
+
+    def crossover(self, type : str = 'single_point'):
+        """
+        Function to crossover the individuals in the population
+        :param type: a string representing the type of crossover to apply
+        """
+        if type == 'single_point':
+            self.single_point()
+
+        elif type == 'multi_point':
+            self.multi_point()
+
+        elif type == 'uniform':
+            self.uniform()
+            
+
+    def single_point(self):
+        """
+        Function to apply single point crossover
+        """
+        pass
+
+    def multi_point(self, n_points : int = 2):
+        """
+        Function to apply multi point crossover
+        :param n_points: an int representing the number of points to crossover
+        """
+        pass
+
+    def uniform(self):
+        """
+        Function to apply uniform crossover
+        """
+        pass
+        
 
 
 
