@@ -291,6 +291,12 @@ class Individual:
 
     def __repr__(self):
         return str(self.board)
+    
+    def flatten(self):
+        self.board = self.board.flatten()
+    
+    def unflatten(self):
+        self.board = self.board.reshape(self.N, self.N)
 
 
     # [TO DO] -------------------------------------------------------------------------------------
@@ -322,6 +328,27 @@ class Population:
 
     def __getitem__(self, position):
         return self.individuals[position]
+    
+    def selection(self, type : str = 'roulette'):
+        """
+        Function to select the individuals in the population
+        :param type: a string representing the type of selection to apply
+        """
+        if type == 'roulette':
+            self.roulette()
+
+    def roulette(self):
+        """
+        Function to apply roulette selection
+        """
+
+        # Calculate the fitness of each individual, total fitness and probs
+        fitnesses = [individual.fitness for individual in self.individuals]
+        total_fitness = sum(fitnesses)
+        probabilities = [fitness / total_fitness for fitness in fitnesses]
+        
+        # Select the individuals using roulette wheel
+        self.individuals = np.random.choice(self.individuals, size=self.size, p=probabilities, replace=True)
 
     def crossover(self, type : str = 'single_point'):
         """
@@ -342,6 +369,7 @@ class Population:
         """
         Function to apply single point crossover
         """
+
         pass
 
     def multi_point(self, n_points : int = 2):
