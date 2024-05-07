@@ -1,4 +1,5 @@
 import numpy as np
+from operator import attrgetter
 
 # The purpose of this class is to generate a random sudoku puzzle
 class sudoku_game:
@@ -123,6 +124,31 @@ class sudoku_game:
 
 # The purpose of this class is to create an individual sudoku puzzle, to which the genetic algorithm will be applied
 class Individual:
+    """
+    A class to represent a sudoku puzzle. This class provides methods to initialize a sudoku board, fill it randomly, remove numbers, check for uniqueness, and calculate the fitness of the board.
+    
+    The `Individual` class has the following methods:
+    
+    - `__init__(self, initial_board: np.ndarray = np.zeros((9,9), dtype=int), board: np.ndarray = None)`: Constructor for the sudoku class. Initializes the board with the given initial board or a randomly filled board.
+    - `random_fill_board(self)`: Fills the empty cells in the board randomly while ensuring the board is still valid.
+    - `remove_numbers(self, removed_numbers: int = 20)`: Removes a specified number of numbers from the board.
+    - `is_unique(self)`: Checks if the solution to the sudoku puzzle is unique.
+    - `get_neighbours(self, number_of_neighbours: int = 10, swap_number: int = 2)`: Generates a specified number of neighbor boards by swapping numbers in the board.
+    - `get_fitness(self)`: Calculates the fitness of the board based on the number of conflicts in the rows, columns, and boxes.
+    - `get_row_conflicts(self, position)`, `get_column_conflicts(self, position)`, and `get_box_conflicts(self, position)`: Helper functions to calculate the number of conflicts in a row, column, and box, respectively.
+    - `get_box_coordinates(self, position)`: Helper function to get the coordinates of the box that a given position is in.
+    - `__getitem__(self, position)` and `__setitem__(self, position, value)`: Dunder methods to access and set the value of a cell in the board.
+    - `__repr__(self)`: Dunder method to represent the board as a string.
+    - `flatten(self)` and `unflatten(self)`: Helper methods to flatten and unflatten the board.
+    - `mutate(self, mutation_rate: float = 0.1)`: A TODO method to mutate the individual, i.e., change the board randomly.
+    """
+    """
+    A class to represent a sudoku puzzle. The `Individual` class encapsulates the state of a sudoku board, including the initial board that cannot be changed, and the current board state. It provides methods to randomly fill in the empty cells, remove numbers, check if a solution is unique, and calculate the fitness of the board based on the number of conflicts.
+    
+    The class also provides methods to get the neighbors of the current board by swapping numbers, and to calculate the number of conflicts in each row, column, and box of the board.
+    
+    The class has various dunder methods to allow indexing and representation of the board.
+    """
     """
     A class to represent a sudoku puzzle
     """
@@ -293,19 +319,32 @@ class Individual:
         return str(self.board)
     
     def flatten(self):
-        self.board = self.board.flatten()
+        return self.board.flatten()
     
     def unflatten(self):
-        self.board = self.board.reshape(self.N, self.N)
+        return self.board.reshape(self.N, self.N)
 
 
     # [TO DO] -------------------------------------------------------------------------------------
 
-    def mutate(self, mutation_rate : float = 0.1):
+    def mutate(self, mutation_rate : float = 0.1, swap_number : int = 1):
         """
         Function to mutate the individual, i.e. change the board randomly
         """
-        pass
+        # TODO: Do not mutate elite
+        # TODO: Check if it all works correctly
+        if np.random.rand() < mutation_rate:
+            mutated_board = self.board.copy()
+            np.random.shuffle(self.swappable_positions)
+            for i in range(swap_number):
+                # Randomly select two swappable positions
+                mutated_board[self.swappable_positions[2 * i]], mutated_board[self.swappable_positions[2 * i + 1]] = (
+                    mutated_board[self.swappable_positions[2 * i + 1]],
+                    mutated_board[self.swappable_positions[2 * i]],
+                )
+            return self.__class__(self.initial_board, mutated_board)
+        else:
+            return self
 
 
 
@@ -314,17 +353,38 @@ class Population:
     """
     A class to represent a population of sudoku puzzles
     """
-    def __init__(self, size, **kwargs):
+    def __init__(self, size, initial_board : np.ndarray = np.zeros((9,9), dtype=int),  **kwargs):
         # population size
         self.size = size
         self.individuals = []
 
         # appending the population with individuals
         for _ in range(size):
-            self.individuals.append(Individual())
+            self.individuals.append(Individual(initial_board, **kwargs))
+
+    def evolve(self, gens, xo_prob, mut_prob, select_type, xo, mutate, elitism):
+        # gens = 100
+        for i in range(gens):
+            # selection
+            self.selection(select_type)
+            # crossover
+            self.crossover(xo, xo_prob, elitism)
+
+            self.individuals = [i.mutate(mut_prob) for i in self.individuals]
+
+            print(f"Best individual of gen #{i + 1}: {max([i.fitness for i in self.individuals])}")
+
 
     def __len__(self):
         return len(self.individuals)
+    
+    def get_best_individual(self):
+        """
+        Function to get the best individual of the population
+        """
+        fitnesses = [individual.fitness for individual in self.individuals]
+        best_fitness_index = fitnesses.index(min(fitnesses))  
+        return self.individuals[best_fitness_index]
 
     def __getitem__(self, position):
         return self.individuals[position]
@@ -343,20 +403,24 @@ class Population:
         """
 
         # Calculate the fitness of each individual, total fitness and probs
-        fitnesses = [individual.fitness for individual in self.individuals]
+        fitnesses = [1/(individual.fitness+0.000001) for individual in self.individuals]
         total_fitness = sum(fitnesses)
         probabilities = [fitness / total_fitness for fitness in fitnesses]
         
         # Select the individuals using roulette wheel
         self.individuals = np.random.choice(self.individuals, size=self.size, p=probabilities, replace=True)
 
-    def crossover(self, type : str = 'single_point'):
+    def crossover(self, type : str = 'single_point', prob : float = 0.5, elitism : bool = False):
         """
         Function to crossover the individuals in the population
         :param type: a string representing the type of crossover to apply
         """
+
+        # Add elitism later
+
+
         if type == 'single_point':
-            self.single_point()
+            self.single_point(prob, elitism=elitism)
 
         elif type == 'multi_point':
             self.multi_point()
@@ -365,12 +429,64 @@ class Population:
             self.uniform()
             
 
-    def single_point(self):
+    def single_point(self, prob : float = 0.5, elitism : bool = False):
         """
         Function to apply single point crossover
         """
+        # TODO: Add elitism
 
-        pass
+        #VERY BAD CODING PRACTICE
+        # TODO: Fix this
+        population_array = np.array([i.flatten() for i in self.individuals])
+            
+        # Get the number of parents and the shape of each parent
+        num_parents = len(self)
+        rows, cols = population_array.shape
+
+        # Sample how many crossovers to do
+        num_crossovers = sum(np.random.choice([0,1], size = int(num_parents/2), replace=True, p=[1-prob, prob]))
+
+        # Select two random parents for each offspring without replacement
+        parent_indices = np.random.choice(num_parents, size=(num_crossovers,2), replace=False)
+
+        # Choose random crossover points for each pair of parents
+        crossover_points = np.random.randint(cols-1, size=num_crossovers)
+
+        # Matrices with parents from both sides
+        parent1 = population_array[parent_indices[:, 0]]
+        parent2 = population_array[parent_indices[:, 1]]
+
+        # Mask all the values that are above/below crossover line with zeros
+        parent1_masked = np.ma.masked_array(parent1, np.arange(cols) > crossover_points[:, np.newaxis]).filled(0)
+        parent2_masked = np.ma.masked_array(parent2, np.arange(cols) <= crossover_points[:, np.newaxis]).filled(0)
+
+        # offsprings are just sum of parents
+        offspring1 = parent1_masked + parent2_masked
+        offspring2 = (parent1 - parent1_masked) + (parent2 - parent2_masked)
+
+        offspring = np.concatenate((offspring1, offspring2))
+
+        # Put parents that didn't get crossovered back into the population
+        if num_crossovers < num_parents:
+            left_ind = np.setdiff1d(np.arange(num_parents), parent_indices.flatten())
+            offspring = np.concatenate((offspring, population_array[left_ind]))
+
+
+        # Append random offsprings from parents until we reach population size
+        if offspring.shape[0] < num_parents:
+            while offspring.shape[0] < num_parents:
+                offspring = np.append(offspring, 
+                                    np.expand_dims(population_array[np.random.choice(len(population_array))], axis=0), axis = 0)
+
+        #VERY BAD CODING PRACTICE
+        # TODO: Fix this
+        offspring_individuals = [self.individuals[0].__class__(self.individuals[0].initial_board, np.reshape(ind, self.individuals[0].board.shape)) for ind in offspring]
+
+        # TODO understand why elitism doesn't work perfectly
+        if elitism:
+            self.individuals = np.concatenate((offspring_individuals[:-1], [self.get_best_individual()]))
+        else:
+            self.individuals = offspring_individuals
 
     def multi_point(self, n_points : int = 2):
         """
@@ -389,7 +505,25 @@ class Population:
 
 
         
-        
+test_board = np.array([[9, 4, 7, 3, 2, 6, 5, 8, 1],
+       [8, 0, 0, 0, 0, 7, 0, 0, 0],
+       [2, 0, 0, 0, 0, 5, 0, 0, 0],
+       [4, 7, 3, 5, 9, 2, 1, 6, 8],
+       [1, 2, 9, 8, 6, 4, 7, 3, 5],
+       [5, 6, 8, 7, 1, 3, 4, 9, 2],
+       [7, 9, 2, 4, 5, 8, 3, 1, 6],
+       [6, 1, 5, 2, 3, 9, 8, 7, 4],
+       [3, 8, 4, 6, 7, 1, 2, 5, 9]])
 
-        
+population = Population(
+size=100,
+initial_board=test_board,
+)
+population.evolve(gens = 10000,
+                  xo_prob = 0.9, 
+                  mut_prob=0.1, 
+                  select_type='roulette', 
+                  xo = 'single_point', 
+                  mutate = True, #should be smth else
+                  elitism = True)
 
