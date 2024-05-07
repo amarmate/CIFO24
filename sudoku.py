@@ -517,11 +517,11 @@ test_board = np.array([[9, 4, 7, 3, 2, 6, 5, 8, 1],
 
 population = Population(
 size=100,
-initial_board=test_board,
+# initial_board=test_board,
 )
 population.evolve(gens = 10000,
                   xo_prob = 0.9, 
-                  mut_prob=0.1, 
+                  mut_prob=0.25, 
                   select_type='roulette', 
                   xo = 'single_point', 
                   mutate = True, #should be smth else
