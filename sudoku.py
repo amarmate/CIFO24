@@ -1,126 +1,6 @@
 import numpy as np
 from operator import attrgetter
 
-# The purpose of this class is to generate a random sudoku puzzle
-class sudoku_game:
-    def __init__(self, difficulty : int, seed : int = None, dimension : int = 9):
-        """
-        Constructor for the sudoku_game class
-        :param difficulty: an integer representing the difficulty of the puzzle to generate
-        :param seed: an integer representing the seed for the random number generator
-        :param dimension: an int representing the dimension of the board (default is 9). Has to be a perfect square
-        """ 
-        # Check if the dimension is a perfect square
-        assert np.sqrt(dimension) % 1 == 0, "The dimension has to be a perfect square"
-
-        # Set the attributes
-        self.difficulty = difficulty
-        self.N = dimension
-        self.seed = seed
-        self.board = np.zeros((self.N, self.N), dtype=int)
-        np.random.seed = seed
-
-    def generate(self):
-        """
-        Function to construct the board
-        """
-        pass
-
-    def __getitem__(self, position):
-        assert len(position) == 2, "The position has to be a tuple of length 2"
-        return self.board[position]
-    
-    def __setitem__(self, position, value):
-        assert len(position) == 2, "The position has to be a tuple of length 2"
-        self.board[position] = value
-
-    def __repr__(self):
-        return str(self.board)
-
-    # -------------------------- Board construction functions -----------------------------------
-
-    # !!! [TODO] -> be careful with impossible boards
-    def fill_diagonals(self):
-        """
-        Function to fill the diagonal blocks of the board, which are the easiest to fill
-        """
-        numbers = np.arange(1, self.N + 1)
-        box_size = int(np.sqrt(self.N))
-        box_order = box_size * np.arange(1, box_size + 1) - 1
-        np.random.shuffle(box_order)
-
-        for i in range(box_size):
-            box = box_order[i]
-            box_coordinates = self.get_box_coordinates((box, box))
-            np.random.shuffle(numbers)
-            for j in range(self.N):
-                self.board[box_coordinates[j]] = numbers[j]
-
-    
-
-
-
-    # ------------------------- Check functions --------------------------------------------------
-
-    def check_is_safe(self, position, number, verbose=False):
-        """
-        Function to check if a number can be placed in a certain position
-        :param position: a tuple representing the position of the box
-        :param number: an int representing the number to check
-        :param verbose: a boolean to print the checks
-        """
-        assert len(position) == 2, "The position has to be a tuple of length 2"
-        assert number > 0 and number <= self.N, "The number has to be between 1 and N"
-
-        # Get the box 
-        box_coordinates = self.get_box_coordinates(position)
-        rows, cols = zip(*box_coordinates)
-        box = self.board[np.array(rows), np.array(cols)]
-
-        inBox = number not in box
-        inRow = number not in self.board[position[0]]
-        inColumn = number not in self.board[:, position[1]]
-
-        if verbose:
-            print("Number already in box: ", not inBox) if not inBox else None
-            print("Number already in row: ", not inRow) if not inRow else None
-            print("Number already in column: ", not inColumn) if not inColumn else None
-
-        return inBox and inRow and inColumn    
-
-    # ------------------------ Other functions ---------------------------------------------------
-
-    def get_box_coordinates(self, position) -> list:
-        """
-        Function to get the coordinates of the box that the position is in. Returns a list of tuples
-        :param position: a tuple representing the position of the box
-        """
-        assert len(position) == 2, "The position has to be a tuple of length 2"
-        assert position[0] < self.N and position[1] < self.N, "The position has to be within the board"
-        box_size = int(np.sqrt(self.N))
-        row, column = position
-        box_row = row // box_size
-        box_column = column // box_size
-        return [(box_row * box_size + i, box_column * box_size + j) for i in range(box_size) for j in range(box_size)]
-    
-
-    # [TO DO] -------------------------------------------------------------------------------------
-
-    def fill_remaining(self):
-        """
-        Function to fill the remaining cells of the board
-        """
-        pass
-    
-
-    def remove_numbers(self):
-        """
-        Function to remove numbers from the board to create a puzzle
-        """
-        pass
-
-
-
 
 # The purpose of this class is to create an individual sudoku puzzle, to which the genetic algorithm will be applied
 class Individual:
@@ -130,7 +10,7 @@ class Individual:
     The `Individual` class has the following methods:
     
     - `__init__(self, initial_board: np.ndarray = np.zeros((9,9), dtype=int), board: np.ndarray = None)`: Constructor for the sudoku class. Initializes the board with the given initial board or a randomly filled board.
-    - `random_fill_board(self)`: Fills the empty cells in the board randomly while ensuring the board is still valid.
+    - `fill_board(self)`: Fills the empty cells in the board while ensuring the board is still valid.
     - `remove_numbers(self, removed_numbers: int = 20)`: Removes a specified number of numbers from the board.
     - `is_unique(self)`: Checks if the solution to the sudoku puzzle is unique.
     - `get_neighbours(self, number_of_neighbours: int = 10, swap_number: int = 2)`: Generates a specified number of neighbor boards by swapping numbers in the board.
@@ -140,7 +20,7 @@ class Individual:
     - `__getitem__(self, position)` and `__setitem__(self, position, value)`: Dunder methods to access and set the value of a cell in the board.
     - `__repr__(self)`: Dunder method to represent the board as a string.
     - `flatten(self)` and `unflatten(self)`: Helper methods to flatten and unflatten the board.
-    - `mutate(self, mutation_rate: float = 0.1)`: A TODO method to mutate the individual, i.e., change the board randomly.
+    - `mutate(self, mutation_rate: float = 0.1)`: A method to mutate the individual, i.e., change the board randomly.
     """
     """
     A class to represent a sudoku puzzle. The `Individual` class encapsulates the state of a sudoku board, including the initial board that cannot be changed, and the current board state. It provides methods to randomly fill in the empty cells, remove numbers, check if a solution is unique, and calculate the fitness of the board based on the number of conflicts.
@@ -167,17 +47,20 @@ class Individual:
         self.swappable_positions = list(zip(*np.where(self.initial_board == 0)))
 
         if board is None:
-            self.random_fill_board()
+            self.fill_board()
         else:
             self.board = board.copy()
 
         self.fitness = self.get_fitness()
 
 
-    def random_fill_board(self):
+    def fill_board(self, logic_fill_first : bool = True):
         """
-        Function to fill in the empty cells (0s) in the board randomly and ensuring that the board is still valid, i.e. no more that 9 of the same number in the board
+        Function to fill in the empty cells (0s) in the board, ensuring that the board is still valid, i.e. no more that 9 of the same number in the board
         """
+        if logic_fill_first:
+            self.logic_fill()
+
         # Flatten the board
         flat_board = self.initial_board.copy().flatten()
 
@@ -193,6 +76,14 @@ class Individual:
         np.putmask(flat_board, flat_board == 0, fill_numbers)
         self.board = flat_board.reshape(self.N, self.N)
 
+
+    def logic_fill(self): 
+        """
+        Function to fill the board with logic
+        """
+
+
+
     def remove_numbers(self, removed_numbers : int = 20):
         # Pick two numbers from 0 to self.N to remove
 
@@ -201,13 +92,11 @@ class Individual:
             removed_numbers(self, removed_numbers)
 
 
-    def is_unique(self):
+    def is_solution_unique(self):
         """
         Function used to check if a solution is unique 
         """
-
-        pass
-        
+        # Try to solve the board with 
 
 
 
@@ -241,6 +130,7 @@ class Individual:
         box_conflicts = np.sum([self.get_box_conflicts(i) for i in range(self.N)])
         return row_conflicts + column_conflicts + box_conflicts
 
+
     def get_row_conflicts(self, position):
         """
         Function to get the number of conflicts in a row
@@ -273,7 +163,7 @@ class Individual:
         rows, cols = zip(*box_coordinates)
         box = self.board[np.array(rows), np.array(cols)]
         return self.N - len(np.unique(box))
-
+    
 
     def get_box_coordinates(self, position) -> list:
         """
@@ -300,6 +190,28 @@ class Individual:
         
         else:
             raise ValueError("The position has to be a tuple or an int")
+        
+        
+    def get_possible_numbers(self, position):
+        """
+        Function to get the possible numbers that can be filled in a given position
+        :param position: a tuple representing the coordinates of the position
+        """
+        assert len(position) == 2, "The position has to be a tuple of length 2"
+
+        # Lets get the row, column and box values
+        row, column = position
+        row = self.board[row]
+        column = self.board[:, column]
+        box_coordinates = self.get_box_coordinates(position)
+        rows, cols = zip(*box_coordinates)
+        box = self.board[np.array(rows), np.array(cols)]
+
+        # Get the possible numbers
+        possible_numbers = np.setdiff1d(np.arange(1, self.N + 1), np.unique(np.concatenate((row, column, box))))
+
+        return possible_numbers
+
 
 
 
@@ -345,185 +257,3 @@ class Individual:
             return self.__class__(self.initial_board, mutated_board)
         else:
             return self
-
-
-
-# Handle this TODO !!!!
-class Population:
-    """
-    A class to represent a population of sudoku puzzles
-    """
-    def __init__(self, size, initial_board : np.ndarray = np.zeros((9,9), dtype=int),  **kwargs):
-        # population size
-        self.size = size
-        self.individuals = []
-
-        # appending the population with individuals
-        for _ in range(size):
-            self.individuals.append(Individual(initial_board, **kwargs))
-
-    def evolve(self, gens, xo_prob, mut_prob, select_type, xo, mutate, elitism):
-        # gens = 100
-        for i in range(gens):
-            # selection
-            self.selection(select_type)
-            # crossover
-            self.crossover(xo, xo_prob, elitism)
-
-            self.individuals = [i.mutate(mut_prob) for i in self.individuals]
-
-            print(f"Best individual of gen #{i + 1}: {max([i.fitness for i in self.individuals])}")
-
-
-    def __len__(self):
-        return len(self.individuals)
-    
-    def get_best_individual(self):
-        """
-        Function to get the best individual of the population
-        """
-        fitnesses = [individual.fitness for individual in self.individuals]
-        best_fitness_index = fitnesses.index(min(fitnesses))  
-        return self.individuals[best_fitness_index]
-
-    def __getitem__(self, position):
-        return self.individuals[position]
-    
-    def selection(self, type : str = 'roulette'):
-        """
-        Function to select the individuals in the population
-        :param type: a string representing the type of selection to apply
-        """
-        if type == 'roulette':
-            self.roulette()
-
-    def roulette(self):
-        """
-        Function to apply roulette selection
-        """
-
-        # Calculate the fitness of each individual, total fitness and probs
-        fitnesses = [1/(individual.fitness+0.000001) for individual in self.individuals]
-        total_fitness = sum(fitnesses)
-        probabilities = [fitness / total_fitness for fitness in fitnesses]
-        
-        # Select the individuals using roulette wheel
-        self.individuals = np.random.choice(self.individuals, size=self.size, p=probabilities, replace=True)
-
-    def crossover(self, type : str = 'single_point', prob : float = 0.5, elitism : bool = False):
-        """
-        Function to crossover the individuals in the population
-        :param type: a string representing the type of crossover to apply
-        """
-
-        # Add elitism later
-
-
-        if type == 'single_point':
-            self.single_point(prob, elitism=elitism)
-
-        elif type == 'multi_point':
-            self.multi_point()
-
-        elif type == 'uniform':
-            self.uniform()
-            
-
-    def single_point(self, prob : float = 0.5, elitism : bool = False):
-        """
-        Function to apply single point crossover
-        """
-        # TODO: Add elitism
-
-        #VERY BAD CODING PRACTICE
-        # TODO: Fix this
-        population_array = np.array([i.flatten() for i in self.individuals])
-            
-        # Get the number of parents and the shape of each parent
-        num_parents = len(self)
-        rows, cols = population_array.shape
-
-        # Sample how many crossovers to do
-        num_crossovers = sum(np.random.choice([0,1], size = int(num_parents/2), replace=True, p=[1-prob, prob]))
-
-        # Select two random parents for each offspring without replacement
-        parent_indices = np.random.choice(num_parents, size=(num_crossovers,2), replace=False)
-
-        # Choose random crossover points for each pair of parents
-        crossover_points = np.random.randint(cols-1, size=num_crossovers)
-
-        # Matrices with parents from both sides
-        parent1 = population_array[parent_indices[:, 0]]
-        parent2 = population_array[parent_indices[:, 1]]
-
-        # Mask all the values that are above/below crossover line with zeros
-        parent1_masked = np.ma.masked_array(parent1, np.arange(cols) > crossover_points[:, np.newaxis]).filled(0)
-        parent2_masked = np.ma.masked_array(parent2, np.arange(cols) <= crossover_points[:, np.newaxis]).filled(0)
-
-        # offsprings are just sum of parents
-        offspring1 = parent1_masked + parent2_masked
-        offspring2 = (parent1 - parent1_masked) + (parent2 - parent2_masked)
-
-        offspring = np.concatenate((offspring1, offspring2))
-
-        # Put parents that didn't get crossovered back into the population
-        if num_crossovers < num_parents:
-            left_ind = np.setdiff1d(np.arange(num_parents), parent_indices.flatten())
-            offspring = np.concatenate((offspring, population_array[left_ind]))
-
-
-        # Append random offsprings from parents until we reach population size
-        if offspring.shape[0] < num_parents:
-            while offspring.shape[0] < num_parents:
-                offspring = np.append(offspring, 
-                                    np.expand_dims(population_array[np.random.choice(len(population_array))], axis=0), axis = 0)
-
-        #VERY BAD CODING PRACTICE
-        # TODO: Fix this
-        offspring_individuals = [self.individuals[0].__class__(self.individuals[0].initial_board, np.reshape(ind, self.individuals[0].board.shape)) for ind in offspring]
-
-        # TODO understand why elitism doesn't work perfectly
-        if elitism:
-            self.individuals = np.concatenate((offspring_individuals[:-1], [self.get_best_individual()]))
-        else:
-            self.individuals = offspring_individuals
-
-    def multi_point(self, n_points : int = 2):
-        """
-        Function to apply multi point crossover
-        :param n_points: an int representing the number of points to crossover
-        """
-        pass
-
-    def uniform(self):
-        """
-        Function to apply uniform crossover
-        """
-        pass
-        
-
-
-
-        
-test_board = np.array([[9, 4, 7, 3, 2, 6, 5, 8, 1],
-       [8, 0, 0, 0, 0, 7, 0, 0, 0],
-       [2, 0, 0, 0, 0, 5, 0, 0, 0],
-       [4, 7, 3, 5, 9, 2, 1, 6, 8],
-       [1, 2, 9, 8, 6, 4, 7, 3, 5],
-       [5, 6, 8, 7, 1, 3, 4, 9, 2],
-       [7, 9, 2, 4, 5, 8, 3, 1, 6],
-       [6, 1, 5, 2, 3, 9, 8, 7, 4],
-       [3, 8, 4, 6, 7, 1, 2, 5, 9]])
-
-population = Population(
-size=100,
-# initial_board=test_board,
-)
-population.evolve(gens = 10000,
-                  xo_prob = 0.9, 
-                  mut_prob=0.25, 
-                  select_type='roulette', 
-                  xo = 'single_point', 
-                  mutate = True, #should be smth else
-                  elitism = True)
-
