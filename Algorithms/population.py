@@ -1,5 +1,5 @@
 import numpy as np 
-from sudoku import Individual
+from Algorithms.sudoku import Individual
 
 class Population:
     """
@@ -23,7 +23,15 @@ class Population:
 
 
     # Lets do recursive ! TODO : Fix this
-    def evolve(self, gens, xo_prob, mut_prob, select_type, xo, mutate, elitism):
+    def evolve(self, gens, select_type, cross_over, mutate, elitism):
+        """
+        Function to evolve the population
+        :param gens: an int representing the number of generations to evolve
+        :param select_type: a function for the selection to apply
+        :param cross_over: a function for the crossover to apply
+        :param mutate: a function for the mutation to apply
+        :param elitism: a boolean representing whether to apply elitism
+        """
         # gens = 100
         for i in range(gens):
             # selection
@@ -31,7 +39,8 @@ class Population:
             # crossover
             self.crossover(xo, xo_prob, elitism)
 
-            self.individuals = [i.mutate(mut_prob) for i in self.individuals]
+            # mutate
+            self.mutate()
             print(f"Best individual of gen #{i + 1}: {max([i.fitness for i in self.individuals])}")
 
 
@@ -83,6 +92,11 @@ class Population:
         # Select the individuals based on the probabilities        
         self.individuals = np.random.choice(self.individuals, size=self.size, p=list(probabilities.values()), replace=True)
 
+
+
+
+
+# ------------------------- TO REMOVE !!! --------------------------------------------------
     def crossover(self, type : str = 'single_point', prob : float = 0.5, elitism : bool = False):
         """
         Function to crossover the individuals in the population
@@ -156,28 +170,7 @@ class Population:
         if elitism:
             self.individuals = np.concatenate((offspring_individuals[:-1], [self.get_best_individual()]))
         else:
-            self.individuals = offspring_individuals
-
-    def multi_point(self, n_points : int = 2):
-        """
-        Function to apply multi point crossover
-        :param n_points: an int representing the number of points to crossover
-        """
-        pass
-
-    def uniform(self):
-        """
-        Function to apply uniform crossover
-        """
-        pass
-
-    def xo_sudoku(self): 
-        """
-        Function to do cross-over on a sudoku board
-        """
-
-        # For crossover, we need to ensure that the offspring is a valid sudoku board
-        # We can only take 
+            self.individuals = offspring_individuals 
 
 
 

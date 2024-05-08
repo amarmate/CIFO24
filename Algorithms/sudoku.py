@@ -213,9 +213,6 @@ class Individual:
         return possible_numbers
 
 
-
-
-
     # ------------------------- Dunder methods --------------------------------------------------
 
     def __getitem__(self, position):
@@ -238,22 +235,3 @@ class Individual:
 
 
     # [TO DO] -------------------------------------------------------------------------------------
-
-    def mutate(self, mutation_rate : float = 0.1, swap_number : int = 1):
-        """
-        Function to mutate the individual, i.e. change the board randomly
-        """
-        # TODO: Do not mutate elite
-        # TODO: Check if it all works correctly
-        if np.random.rand() < mutation_rate:
-            mutated_board = self.board.copy()
-            np.random.shuffle(self.swappable_positions)
-            for i in range(swap_number):
-                # Randomly select two swappable positions
-                mutated_board[self.swappable_positions[2 * i]], mutated_board[self.swappable_positions[2 * i + 1]] = (
-                    mutated_board[self.swappable_positions[2 * i + 1]],
-                    mutated_board[self.swappable_positions[2 * i]],
-                )
-            return self.__class__(self.initial_board, mutated_board)
-        else:
-            return self
