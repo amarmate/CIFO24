@@ -164,12 +164,15 @@ class Individual:
         # The initial board is the board that cannot be changed
         self.initial_board = initial_board.copy()
         self.N = initial_board.shape[0]
-        self.swappable_positions = list(zip(*np.where(self.initial_board == 0)))
+        self.swappable_positions = self.initial_board == 0
 
         if board is None:
             self.random_fill_board()
         else:
             self.board = board.copy()
+
+        self.representation = self.board[self.swappable_positions]
+        self.distribution = np.bincount(self.representation, minlength=self.N + 1)
 
         self.fitness = self.get_fitness()
 
@@ -332,19 +335,15 @@ class Individual:
         Function to mutate the individual, i.e. change the board randomly
         """
         # TODO: Do not mutate elite
-        # TODO: Check if it all works correctly
+
         if np.random.rand() < mutation_rate:
-            mutated_board = self.board.copy()
-            np.random.shuffle(self.swappable_positions)
             for i in range(swap_number):
-                # Randomly select two swappable positions
-                mutated_board[self.swappable_positions[2 * i]], mutated_board[self.swappable_positions[2 * i + 1]] = (
-                    mutated_board[self.swappable_positions[2 * i + 1]],
-                    mutated_board[self.swappable_positions[2 * i]],
-                )
-            return self.__class__(self.initial_board, mutated_board)
+                x,y = np.random.choice(len(self.representation), 2, replace=False)
+                self.representation[x], self.representation[y] = self.representation[y], self.representation[x]
+
+                np.putmask(self.board, self.swappable_positions == 0, self.representation)
         else:
-            return self
+            pass
 
 
 
@@ -362,7 +361,7 @@ class Population:
         for _ in range(size):
             self.individuals.append(Individual(initial_board, **kwargs))
 
-    def evolve(self, gens, xo_prob, mut_prob, select_type, xo, mutate, elitism):
+    def evolve(self, gens, xo_prob, mut_prob, select_type, xo, mutate, elitism, keep_distribution=False):
         # gens = 100
         for i in range(gens):
             # selection
@@ -370,9 +369,13 @@ class Population:
             # crossover
             self.crossover(xo, xo_prob, elitism)
 
-            self.individuals = [i.mutate(mut_prob) for i in self.individuals]
+            for j in self.individuals:
+                j.mutate(mut_prob)
 
-            print(f"Best individual of gen #{i + 1}: {max([i.fitness for i in self.individuals])}")
+            if keep_distribution:
+                self.keep_distribution()
+
+            print(f"Best individual of gen #{i + 1}: {max([ind.fitness for ind in self.individuals])}")
 
 
     def __len__(self):
@@ -389,6 +392,43 @@ class Population:
     def __getitem__(self, position):
         return self.individuals[position]
     
+    def __setitem__(self, position, value):
+        self.individuals[position] = value
+    
+    def keep_distribution(self):
+        """
+        Function to keep the corretc distribution of numbers inside each individual 
+        """
+
+        # TODO check why it doesnt really preserve distribution in some cases
+        # print("Perfect distribution", self[0].distribution)
+
+        perfect_distribution = np.tile(self[0].distribution, (len(self), 1))
+        real_distribution = np.apply_along_axis(lambda row: np.bincount(row, minlength=self[0].N + 1), axis=1, arr=[self[i].representation for i in range(len(self))])
+        difference = perfect_distribution - real_distribution
+
+        numbers = np.tile(np.indices(difference[0].shape)[0], (self[0].N + 1,1))
+        add = np.where(difference < 0, 0, difference)
+        remove = np.where(difference > 0, 0, -difference)
+        for i in range(len(self)):
+            if np.sum(remove[i]) > 0:
+                # print('Iteration ', i, ' Before ', self[i].representation)
+                values_add = np.repeat(numbers[i], add[i], axis=0)
+                np.random.shuffle(values_add)
+                values_remove = np.repeat(numbers[i], remove[i], axis=0)
+
+                counts = {val: np.sum(values_remove == val) for val in np.unique(values_remove)}
+                mask = np.isin(self[i].representation, values_remove)
+                
+                # Get the random indices of elements to mask that match values remove in offspring
+                indices_to_mask = np.concatenate([np.random.choice(np.flatnonzero(mask & (self[i].representation == val)), 
+                                                                size=counts[val], 
+                                                                replace=False) for val in counts.keys()])
+                self[i].representation[indices_to_mask] = 0
+                np.putmask(self[i].representation, self[i].representation == 0, values_add)
+                # print('Iteration ', i, ' After ',self[i].representation)
+            else:
+                pass
     def selection(self, type : str = 'roulette'):
         """
         Function to select the individuals in the population
@@ -422,14 +462,14 @@ class Population:
         if type == 'single_point':
             self.single_point(prob, elitism=elitism)
 
-        elif type == 'multi_point':
-            self.multi_point()
+        elif type == 'pmxc':
+            self.pmx_crossover()
 
         elif type == 'uniform':
             self.uniform()
             
 
-    def single_point(self, prob : float = 0.5, elitism : bool = False):
+    def single_point(self, prob : float = 0.5, elitism : bool = False, keep_distribution : bool = False):
         """
         Function to apply single point crossover
         """
@@ -437,7 +477,7 @@ class Population:
 
         #VERY BAD CODING PRACTICE
         # TODO: Fix this
-        population_array = np.array([i.flatten() for i in self.individuals])
+        population_array = np.array([i.representation for i in self.individuals])
             
         # Get the number of parents and the shape of each parent
         num_parents = len(self)
@@ -477,16 +517,31 @@ class Population:
             while offspring.shape[0] < num_parents:
                 offspring = np.append(offspring, 
                                     np.expand_dims(population_array[np.random.choice(len(population_array))], axis=0), axis = 0)
+                
+        if keep_distribution:
 
-        #VERY BAD CODING PRACTICE
-        # TODO: Fix this
-        offspring_individuals = [self.individuals[0].__class__(self.individuals[0].initial_board, np.reshape(ind, self.individuals[0].board.shape)) for ind in offspring]
+            perfect_distribution = np.tile(self.individuals[0].distribution, len(offspring))
+            real_distribution = np.apply_along_axis(lambda row: np.bincount(row, minlength=10), axis=1, arr=offspring)
+            difference = perfect_distribution - real_distribution
 
-        # TODO understand why elitism doesn't work perfectly
-        if elitism:
-            self.individuals = np.concatenate((offspring_individuals[:-1], [self.get_best_individual()]))
-        else:
-            self.individuals = offspring_individuals
+        
+        # Put the offsprings into the population
+        for i in range(len(self)):
+            # Put elite as a first element
+            if elitism and i == 0:
+                self.individuals[i] = self.get_best_individual()
+            else:
+                self.individuals[i].representation = offspring[i]
+                np.putmask(self.individuals[i].board, self.individuals[i].swappable_positions == 0, self.individuals[i].representation)
+
+        
+
+        
+
+    def pmx_crossover(self):
+        """
+        Function to apply partially mapped crossover
+        """
 
     def multi_point(self, n_points : int = 2):
         """
@@ -503,27 +558,70 @@ class Population:
         
 
 
-
-        
+            
 test_board = np.array([[9, 4, 7, 3, 2, 6, 5, 8, 1],
-       [8, 0, 0, 0, 0, 7, 0, 0, 0],
-       [2, 0, 0, 0, 0, 5, 0, 0, 0],
-       [4, 7, 3, 5, 9, 2, 1, 6, 8],
-       [1, 2, 9, 8, 6, 4, 7, 3, 5],
-       [5, 6, 8, 7, 1, 3, 4, 9, 2],
-       [7, 9, 2, 4, 5, 8, 3, 1, 6],
-       [6, 1, 5, 2, 3, 9, 8, 7, 4],
-       [3, 8, 4, 6, 7, 1, 2, 5, 9]])
+[8, 0, 0, 0, 0, 7, 0, 0, 0],
+[2, 0, 0, 0, 0, 5, 0, 0, 0],
+[4, 7, 3, 5, 9, 2, 1, 6, 8],
+[1, 2, 9, 8, 6, 4, 7, 3, 5],
+[5, 6, 8, 7, 1, 3, 4, 9, 2],
+[7, 9, 2, 4, 5, 8, 3, 1, 6],
+[6, 1, 5, 2, 3, 9, 8, 7, 4],
+[3, 8, 4, 6, 7, 1, 2, 5, 9]])
 
-population = Population(
-size=100,
+
+    # population = Population(
+    # size=100,
+    # initial_board=test_board,
+    # )
+    # population.evolve(gens = 10000,
+    #                 xo_prob = 0.9, 
+    #                 mut_prob=0.1, 
+    #                 select_type='roulette', 
+    #                 xo = 'single_point', 
+    #                 mutate = True, #should be smth else
+    #                 elitism = True)
+
+
+# population = Population(
 # initial_board=test_board,
-)
-population.evolve(gens = 10000,
-                  xo_prob = 0.9, 
-                  mut_prob=0.25, 
-                  select_type='roulette', 
-                  xo = 'single_point', 
-                  mutate = True, #should be smth else
-                  elitism = True)
+# size=10
+# )
 
+# population.evolve(gens = 10,
+#                     xo_prob = 0.9, 
+#                     mut_prob=1, 
+#                     select_type='roulette', 
+#                     xo = 'single_point', 
+#                     mutate = True, #should be smth else
+#                     elitism = True)
+
+
+# print("Perfect distribution", population.individuals[0].distribution)
+
+# perfect_distribution = np.tile(population.individuals[0].distribution, (len(population.individuals), 1))
+# real_distribution = np.apply_along_axis(lambda row: np.bincount(row, minlength=population.individuals[0].N + 1), axis=1, arr=[i.representation for i in population.individuals])
+# difference = perfect_distribution - real_distribution
+
+# numbers = np.tile(np.indices(difference[0].shape)[0], (population.individuals[0].N + 1,1))
+# add = np.where(difference < 0, 0, difference)
+# remove = np.where(difference > 0, 0, -difference)
+# for i in range(len(population.individuals)):
+#     if np.sum(remove[i]) > 0:
+#         print('Iteration ', i, ' Before ', population.individuals[i].representation)
+#         values_add = np.repeat(numbers[i], add[i], axis=0)
+#         np.random.shuffle(values_add)
+#         values_remove = np.repeat(numbers[i], remove[i], axis=0)
+
+#         counts = {val: np.sum(values_remove == val) for val in np.unique(values_remove)}
+#         mask = np.isin(population.individuals[i].representation, values_remove)
+        
+#         # Get the random indices of elements to mask that match values remove in offspring
+#         indices_to_mask = np.concatenate([np.random.choice(np.flatnonzero(mask & (population.individuals[i].representation == val)), 
+#                                                         size=counts[val], 
+#                                                         replace=False) for val in counts.keys()])
+#         population.individuals[i].representation[indices_to_mask] = 0
+#         np.putmask(population.individuals[i].representation, population.individuals[i].representation == 0, values_add)
+#         print('Iteration ', i, ' After ',population.individuals[i].representation)
+#     else:
+#         pass
