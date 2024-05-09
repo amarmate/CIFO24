@@ -15,7 +15,7 @@ class Population:
             self.individuals.append(Individual(initial_board, **kwargs))
 
     def evolve(self, gens, xo_prob, mut_prob, select_type, xo, elitism, keep_distribution=False):
-        # gens = 100
+
         for i in range(gens):
             # selection
             self.selection(select_type)
@@ -23,7 +23,7 @@ class Population:
             self.crossover(xo, xo_prob, elitism)
 
             for j in range(len(self.individuals)):
-                self[j].mutate(mut_prob)
+                self[j] = self[j].mutate(mut_prob)
 
             if keep_distribution:
                 self.keep_distribution()

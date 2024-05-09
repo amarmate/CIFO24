@@ -204,17 +204,21 @@ class Individual:
 
     # [TO DO] -------------------------------------------------------------------------------------
 
-    def mutate(self, mutation_rate : float = 0.1, swap_number : int = 1):
+    def mutate(self, mutation_rate : float = 0.1, swap_number : int = 5):
         """
         Function to mutate the individual, i.e. change the board randomly
         """
         # TODO: Do not mutate elite
 
         if np.random.rand() < mutation_rate:
-            for i in range(swap_number):
-                x,y = np.random.choice(len(self.representation), 2, replace=False)
-                self.representation[x], self.representation[y] = self.representation[y], self.representation[x]
+            new_representation = self.representation.copy()
+            new_board = self.board.copy()
 
-                np.putmask(self.board, self.swappable_positions, self.representation)
+            for i in range(swap_number):
+                x, y = np.random.choice(len(new_representation), 2, replace=False)
+                new_representation[x], new_representation[y] = new_representation[y], new_representation[x]
+
+            np.putmask(new_board, self.swappable_positions, new_representation)
+            return self.__class__(self.initial_board, new_board)
         else:
-            pass
+            return self
