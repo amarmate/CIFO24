@@ -1,5 +1,5 @@
 import numpy as np 
-from Algorithms.sudoku import Individual
+from Algorithms.individual import Individual
 
 class Population:
     """
@@ -30,9 +30,7 @@ class Population:
 
             print(f"Best individual of gen #{i + 1}: {min([ind.fitness for ind in self.individuals])}")
 
-
-    def __len__(self):
-        return len(self.individuals)
+    # -------------------------------------------------------------------------------------------------------
     
     def get_best_individual(self):
         """
@@ -50,7 +48,7 @@ class Population:
     
     def keep_distribution(self):
         """
-        Function to keep the corretc distribution of numbers inside each individual 
+        Function to keep the correct distribution of numbers inside each individual 
         """
 
         # TODO check why it doesnt really preserve distribution in some cases
@@ -86,6 +84,8 @@ class Population:
                 difference1 = perfect_distribution - real_distribution
             else:
                 pass
+
+
     def selection(self, type : str = 'roulette'):
         """
         Function to select the individuals in the population
@@ -106,6 +106,8 @@ class Population:
         
         # Select the individuals using roulette wheel
         self.individuals = np.random.choice(self.individuals, size=self.size, p=probabilities, replace=True)
+
+
 
     def crossover(self, type : str = 'single_point', prob : float = 0.5, elitism : bool = False):
         """
@@ -192,9 +194,6 @@ class Population:
                 np.putmask(self.individuals[i].board, self.individuals[i].swappable_positions == 0, self.individuals[i].representation)
 
         
-
-        
-
     def pmx_crossover(self):
         """
         Function to apply partially mapped crossover
@@ -214,7 +213,8 @@ class Population:
         pass
 
 
-
+    def __len__(self):
+        return len(self.individuals)
 
 
 # ------------------------- Main --------------------------------------------------
