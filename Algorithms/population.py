@@ -14,7 +14,7 @@ class Population:
         for _ in range(size):
             self.individuals.append(Individual(initial_board, **kwargs))
 
-    def evolve(self, gens, xo_prob, mut_prob, select_type, xo, mutate, elitism, keep_distribution=False):
+    def evolve(self, gens, xo_prob, mut_prob, select_type, xo, elitism, keep_distribution=False):
         # gens = 100
         for i in range(gens):
             # selection
@@ -22,13 +22,13 @@ class Population:
             # crossover
             self.crossover(xo, xo_prob, elitism)
 
-            for j in self.individuals:
-                j.mutate(mut_prob)
+            for j in range(len(self.individuals)):
+                self[j].mutate(mut_prob)
 
             if keep_distribution:
                 self.keep_distribution()
 
-            print(f"Best individual of gen #{i + 1}: {max([ind.fitness for ind in self.individuals])}")
+            print(f"Best individual of gen #{i + 1}: {min([ind.fitness for ind in self.individuals])}")
 
 
     def __len__(self):
@@ -60,12 +60,13 @@ class Population:
         real_distribution = np.apply_along_axis(lambda row: np.bincount(row, minlength=self[0].N + 1), axis=1, arr=[self[i].representation for i in range(len(self))])
         difference = perfect_distribution - real_distribution
 
-        numbers = np.tile(np.indices(difference[0].shape)[0], (self[0].N + 1,1))
+        numbers = np.tile(np.indices(difference[0].shape)[0], (len(self) + 1,1))
         add = np.where(difference < 0, 0, difference)
         remove = np.where(difference > 0, 0, -difference)
         for i in range(len(self)):
             if np.sum(remove[i]) > 0:
                 # print('Iteration ', i, ' Before ', self[i].representation)
+                a = self[i].representation
                 values_add = np.repeat(numbers[i], add[i], axis=0)
                 np.random.shuffle(values_add)
                 values_remove = np.repeat(numbers[i], remove[i], axis=0)
@@ -80,6 +81,9 @@ class Population:
                 self[i].representation[indices_to_mask] = 0
                 np.putmask(self[i].representation, self[i].representation == 0, values_add)
                 # print('Iteration ', i, ' After ',self[i].representation)
+                perfect_distribution = np.tile(self[0].distribution, (len(self), 1))
+                real_distribution = np.apply_along_axis(lambda row: np.bincount(row, minlength=self[0].N + 1), axis=1, arr=[self[i].representation for i in range(len(self))])
+                difference1 = perfect_distribution - real_distribution
             else:
                 pass
     def selection(self, type : str = 'roulette'):
@@ -214,25 +218,27 @@ class Population:
 
 
 # ------------------------- Main --------------------------------------------------
-test_board = np.array([[9, 4, 7, 3, 2, 6, 5, 8, 1],
-       [8, 0, 0, 0, 0, 7, 0, 0, 0],
-       [2, 0, 0, 0, 0, 5, 0, 0, 0],
-       [4, 7, 3, 5, 9, 2, 1, 6, 8],
-       [1, 2, 9, 8, 6, 4, 7, 3, 5],
-       [5, 6, 8, 7, 1, 3, 4, 9, 2],
-       [7, 9, 2, 4, 5, 8, 3, 1, 6],
-       [6, 1, 5, 2, 3, 9, 8, 7, 4],
-       [3, 8, 4, 6, 7, 1, 2, 5, 9]])
+if __name__ == '__main__':
+    test_board = np.array([[9, 4, 7, 3, 2, 6, 5, 8, 1],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0],
+        [4, 7, 3, 5, 9, 2, 1, 6, 8],
+        [1, 2, 9, 8, 6, 4, 7, 3, 5],
+        [5, 6, 8, 7, 1, 3, 4, 9, 2],
+        [7, 9, 2, 4, 5, 8, 3, 1, 6],
+        [6, 1, 5, 2, 3, 9, 8, 7, 4],
+        [3, 8, 4, 6, 7, 1, 2, 5, 9]])
 
-population = Population(
-size=100,
-# initial_board=test_board,
-)
-population.evolve(gens = 10000,
-                  xo_prob = 0.9, 
-                  mut_prob=0.25, 
-                  select_type='roulette', 
-                  xo = 'single_point', 
-                  mutate = True, #should be smth else
-                  elitism = True)
+    population = Population(
+    size=10,
+    initial_board=test_board,
+    )
+    population.evolve(gens = 10000,
+                    xo_prob = 0.9, 
+                    mut_prob=0.25, 
+                    select_type='roulette', 
+                    xo = 'single_point', 
+                    mutate = True, #should be smth else
+                    elitism = True,
+                    keep_distribution=True)
 

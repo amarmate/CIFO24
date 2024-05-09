@@ -215,6 +215,6 @@ class Individual:
                 x,y = np.random.choice(len(self.representation), 2, replace=False)
                 self.representation[x], self.representation[y] = self.representation[y], self.representation[x]
 
-                np.putmask(self.board, self.swappable_positions == 0, self.representation)
+                np.putmask(self.board, self.swappable_positions, self.representation)
         else:
             pass
