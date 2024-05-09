@@ -10,7 +10,7 @@ class Individual:
     The `Individual` class has the following methods:
     
     - `__init__(self, initial_board: np.ndarray = np.zeros((9,9), dtype=int), board: np.ndarray = None)`: Constructor for the sudoku class. Initializes the board with the given initial board or a randomly filled board.
-    - `fill_board(self)`: Fills the empty cells in the board while ensuring the board is still valid.
+    - `random_fill_board(self)`: Fills the empty cells in the board randomly while ensuring the board is still valid.
     - `remove_numbers(self, removed_numbers: int = 20)`: Removes a specified number of numbers from the board.
     - `is_unique(self)`: Checks if the solution to the sudoku puzzle is unique.
     - `get_neighbours(self, number_of_neighbours: int = 10, swap_number: int = 2)`: Generates a specified number of neighbor boards by swapping numbers in the board.
@@ -20,7 +20,7 @@ class Individual:
     - `__getitem__(self, position)` and `__setitem__(self, position, value)`: Dunder methods to access and set the value of a cell in the board.
     - `__repr__(self)`: Dunder method to represent the board as a string.
     - `flatten(self)` and `unflatten(self)`: Helper methods to flatten and unflatten the board.
-    - `mutate(self, mutation_rate: float = 0.1)`: A method to mutate the individual, i.e., change the board randomly.
+    - `mutate(self, mutation_rate: float = 0.1)`: A TODO method to mutate the individual, i.e., change the board randomly.
     """
     """
     A class to represent a sudoku puzzle. The `Individual` class encapsulates the state of a sudoku board, including the initial board that cannot be changed, and the current board state. It provides methods to randomly fill in the empty cells, remove numbers, check if a solution is unique, and calculate the fitness of the board based on the number of conflicts.
@@ -44,23 +44,23 @@ class Individual:
         # The initial board is the board that cannot be changed
         self.initial_board = initial_board.copy()
         self.N = initial_board.shape[0]
-        self.swappable_positions = list(zip(*np.where(self.initial_board == 0)))
+        self.swappable_positions = self.initial_board == 0
 
         if board is None:
-            self.fill_board()
+            self.random_fill_board()
         else:
             self.board = board.copy()
+
+        self.representation = self.board[self.swappable_positions]
+        self.distribution = np.bincount(self.representation, minlength=self.N + 1)
 
         self.fitness = self.get_fitness()
 
 
-    def fill_board(self, logic_fill_first : bool = True):
+    def random_fill_board(self):
         """
-        Function to fill in the empty cells (0s) in the board, ensuring that the board is still valid, i.e. no more that 9 of the same number in the board
+        Function to fill in the empty cells (0s) in the board randomly and ensuring that the board is still valid, i.e. no more that 9 of the same number in the board
         """
-        if logic_fill_first:
-            self.logic_fill()
-
         # Flatten the board
         flat_board = self.initial_board.copy().flatten()
 
@@ -76,14 +76,6 @@ class Individual:
         np.putmask(flat_board, flat_board == 0, fill_numbers)
         self.board = flat_board.reshape(self.N, self.N)
 
-
-    def logic_fill(self): 
-        """
-        Function to fill the board with logic
-        """
-
-
-
     def remove_numbers(self, removed_numbers : int = 20):
         # Pick two numbers from 0 to self.N to remove
 
@@ -92,11 +84,13 @@ class Individual:
             removed_numbers(self, removed_numbers)
 
 
-    def is_solution_unique(self):
+    def is_unique(self):
         """
         Function used to check if a solution is unique 
         """
-        # Try to solve the board with 
+
+        pass
+        
 
 
 
@@ -130,7 +124,6 @@ class Individual:
         box_conflicts = np.sum([self.get_box_conflicts(i) for i in range(self.N)])
         return row_conflicts + column_conflicts + box_conflicts
 
-
     def get_row_conflicts(self, position):
         """
         Function to get the number of conflicts in a row
@@ -163,7 +156,7 @@ class Individual:
         rows, cols = zip(*box_coordinates)
         box = self.board[np.array(rows), np.array(cols)]
         return self.N - len(np.unique(box))
-    
+
 
     def get_box_coordinates(self, position) -> list:
         """
@@ -190,27 +183,8 @@ class Individual:
         
         else:
             raise ValueError("The position has to be a tuple or an int")
-        
-        
-    def get_possible_numbers(self, position):
-        """
-        Function to get the possible numbers that can be filled in a given position
-        :param position: a tuple representing the coordinates of the position
-        """
-        assert len(position) == 2, "The position has to be a tuple of length 2"
 
-        # Lets get the row, column and box values
-        row, column = position
-        row = self.board[row]
-        column = self.board[:, column]
-        box_coordinates = self.get_box_coordinates(position)
-        rows, cols = zip(*box_coordinates)
-        box = self.board[np.array(rows), np.array(cols)]
 
-        # Get the possible numbers
-        possible_numbers = np.setdiff1d(np.arange(1, self.N + 1), np.unique(np.concatenate((row, column, box))))
-
-        return possible_numbers
 
 
     # ------------------------- Dunder methods --------------------------------------------------
@@ -226,12 +200,21 @@ class Individual:
 
     def __repr__(self):
         return str(self.board)
-    
-    def flatten(self):
-        return self.board.flatten()
-    
-    def unflatten(self):
-        return self.board.reshape(self.N, self.N)
 
 
     # [TO DO] -------------------------------------------------------------------------------------
+
+    def mutate(self, mutation_rate : float = 0.1, swap_number : int = 1):
+        """
+        Function to mutate the individual, i.e. change the board randomly
+        """
+        # TODO: Do not mutate elite
+
+        if np.random.rand() < mutation_rate:
+            for i in range(swap_number):
+                x,y = np.random.choice(len(self.representation), 2, replace=False)
+                self.representation[x], self.representation[y] = self.representation[y], self.representation[x]
+
+                np.putmask(self.board, self.swappable_positions == 0, self.representation)
+        else:
+            pass

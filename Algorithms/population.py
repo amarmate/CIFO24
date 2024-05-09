@@ -5,14 +5,7 @@ class Population:
     """
     A class to represent a population of sudoku puzzles
     """
-    def __init__(self, size : int = 100, initial_board : np.ndarray = np.zeros((9,9), dtype=int),  **kwargs):
-        """
-        Constructor for the population class
-        :param size: an int representing the size of the population
-        :param initial_board: an NxN numpy array representing the initial state of the board, where N has to be a perfect square. 0s represent empty cells
-        :param kwargs: additional keyword arguments to pass to the Individual class
-        """
-
+    def __init__(self, size, initial_board : np.ndarray = np.zeros((9,9), dtype=int),  **kwargs):
         # population size
         self.size = size
         self.individuals = []
@@ -21,17 +14,7 @@ class Population:
         for _ in range(size):
             self.individuals.append(Individual(initial_board, **kwargs))
 
-
-    # Lets do recursive ! TODO : Fix this
-    def evolve(self, gens, select_type, cross_over, mutate, elitism):
-        """
-        Function to evolve the population
-        :param gens: an int representing the number of generations to evolve
-        :param select_type: a function for the selection to apply
-        :param cross_over: a function for the crossover to apply
-        :param mutate: a function for the mutation to apply
-        :param elitism: a boolean representing whether to apply elitism
-        """
+    def evolve(self, gens, xo_prob, mut_prob, select_type, xo, mutate, elitism, keep_distribution=False):
         # gens = 100
         for i in range(gens):
             # selection
@@ -39,20 +22,17 @@ class Population:
             # crossover
             self.crossover(xo, xo_prob, elitism)
 
-            # mutate
-            self.mutate()
-            print(f"Best individual of gen #{i + 1}: {max([i.fitness for i in self.individuals])}")
+            for j in self.individuals:
+                j.mutate(mut_prob)
+
+            if keep_distribution:
+                self.keep_distribution()
+
+            print(f"Best individual of gen #{i + 1}: {max([ind.fitness for ind in self.individuals])}")
 
 
-
-    # ------------------------- Dunder methods --------------------------------------------------
     def __len__(self):
         return len(self.individuals)
-    
-    def __getitem__(self, position):
-        return self.individuals[position]
-    
-    # ------------------------- Helper methods --------------------------------------------------
     
     def get_best_individual(self):
         """
@@ -62,6 +42,46 @@ class Population:
         best_fitness_index = fitnesses.index(min(fitnesses))  
         return self.individuals[best_fitness_index]
 
+    def __getitem__(self, position):
+        return self.individuals[position]
+    
+    def __setitem__(self, position, value):
+        self.individuals[position] = value
+    
+    def keep_distribution(self):
+        """
+        Function to keep the corretc distribution of numbers inside each individual 
+        """
+
+        # TODO check why it doesnt really preserve distribution in some cases
+        # print("Perfect distribution", self[0].distribution)
+
+        perfect_distribution = np.tile(self[0].distribution, (len(self), 1))
+        real_distribution = np.apply_along_axis(lambda row: np.bincount(row, minlength=self[0].N + 1), axis=1, arr=[self[i].representation for i in range(len(self))])
+        difference = perfect_distribution - real_distribution
+
+        numbers = np.tile(np.indices(difference[0].shape)[0], (self[0].N + 1,1))
+        add = np.where(difference < 0, 0, difference)
+        remove = np.where(difference > 0, 0, -difference)
+        for i in range(len(self)):
+            if np.sum(remove[i]) > 0:
+                # print('Iteration ', i, ' Before ', self[i].representation)
+                values_add = np.repeat(numbers[i], add[i], axis=0)
+                np.random.shuffle(values_add)
+                values_remove = np.repeat(numbers[i], remove[i], axis=0)
+
+                counts = {val: np.sum(values_remove == val) for val in np.unique(values_remove)}
+                mask = np.isin(self[i].representation, values_remove)
+                
+                # Get the random indices of elements to mask that match values remove in offspring
+                indices_to_mask = np.concatenate([np.random.choice(np.flatnonzero(mask & (self[i].representation == val)), 
+                                                                size=counts[val], 
+                                                                replace=False) for val in counts.keys()])
+                self[i].representation[indices_to_mask] = 0
+                np.putmask(self[i].representation, self[i].representation == 0, values_add)
+                # print('Iteration ', i, ' After ',self[i].representation)
+            else:
+                pass
     def selection(self, type : str = 'roulette'):
         """
         Function to select the individuals in the population
@@ -70,50 +90,39 @@ class Population:
         if type == 'roulette':
             self.roulette()
 
-
-    def roulette(self, type='fitness_proportionate'):
+    def roulette(self):
         """
         Function to apply roulette selection
-        :param type: a string representing the type of selection to apply, available 'fitness_proportionate' or 'rank_based'
         """
-        if type == 'fitness_proportionate':
-            # Calculate the fitness of each individual, total fitness and probs
-            fitnesses = [1/(individual.fitness+0.000001) for individual in self.individuals]
-            total_fitness = sum(fitnesses)
-            probabilities = [fitness / total_fitness for fitness in fitnesses]
 
-        elif type == 'rank_based':
-            # Calculate the fitness of each individual, total fitness and probs
-            fitnesses = {i: individual.fitness for i, individual in enumerate(self.individuals)}
-            sorted_fitnesses = sorted(fitnesses.items(), key=lambda x: x[1])
-            probabilities = {i: (2 - 2 * (rank / (self.size - 1))) / self.size for rank, (i, _) in enumerate(sorted_fitnesses)}
-            probabilities = list(probabilities.values())
+        # Calculate the fitness of each individual, total fitness and probs
+        fitnesses = [1/(individual.fitness+0.000001) for individual in self.individuals]
+        total_fitness = sum(fitnesses)
+        probabilities = [fitness / total_fitness for fitness in fitnesses]
+        
+        # Select the individuals using roulette wheel
+        self.individuals = np.random.choice(self.individuals, size=self.size, p=probabilities, replace=True)
 
-        # Select the individuals based on the probabilities        
-        self.individuals = np.random.choice(self.individuals, size=self.size, p=list(probabilities.values()), replace=True)
-
-
-
-
-
-# ------------------------- TO REMOVE !!! --------------------------------------------------
     def crossover(self, type : str = 'single_point', prob : float = 0.5, elitism : bool = False):
         """
         Function to crossover the individuals in the population
-        :param type: a string representing the type of crossover to apply, available 'single_point', 'multi_point', or 'uniform'
+        :param type: a string representing the type of crossover to apply
         """
+
         # Add elitism later
+
+
         if type == 'single_point':
             self.single_point(prob, elitism=elitism)
 
-        elif type == 'multi_point':
-            self.multi_point()
+        elif type == 'pmxc':
+            self.pmx_crossover()
 
         elif type == 'uniform':
             self.uniform()
             
 
-    def single_point(self, prob : float = 0.5, elitism : bool = False):
+    def single_point(self, prob : float = 0.5, elitism : bool = False, keep_distribution : bool = False):
         """
         Function to apply single point crossover
         """
@@ -121,7 +130,7 @@ class Population:
 
         #VERY BAD CODING PRACTICE
         # TODO: Fix this
-        population_array = np.array([i.flatten() for i in self.individuals])
+        population_array = np.array([i.representation for i in self.individuals])
             
         # Get the number of parents and the shape of each parent
         num_parents = len(self)
@@ -161,16 +170,44 @@ class Population:
             while offspring.shape[0] < num_parents:
                 offspring = np.append(offspring, 
                                     np.expand_dims(population_array[np.random.choice(len(population_array))], axis=0), axis = 0)
+                
+        if keep_distribution:
 
-        #VERY BAD CODING PRACTICE
-        # TODO: Fix this
-        offspring_individuals = [self.individuals[0].__class__(self.individuals[0].initial_board, np.reshape(ind, self.individuals[0].board.shape)) for ind in offspring]
+            perfect_distribution = np.tile(self.individuals[0].distribution, len(offspring))
+            real_distribution = np.apply_along_axis(lambda row: np.bincount(row, minlength=10), axis=1, arr=offspring)
+            difference = perfect_distribution - real_distribution
 
-        # TODO understand why elitism doesn't work perfectly
-        if elitism:
-            self.individuals = np.concatenate((offspring_individuals[:-1], [self.get_best_individual()]))
-        else:
-            self.individuals = offspring_individuals 
+        
+        # Put the offsprings into the population
+        for i in range(len(self)):
+            # Put elite as a first element
+            if elitism and i == 0:
+                self.individuals[i] = self.get_best_individual()
+            else:
+                self.individuals[i].representation = offspring[i]
+                np.putmask(self.individuals[i].board, self.individuals[i].swappable_positions == 0, self.individuals[i].representation)
+
+        
+
+        
+
+    def pmx_crossover(self):
+        """
+        Function to apply partially mapped crossover
+        """
+
+    def multi_point(self, n_points : int = 2):
+        """
+        Function to apply multi point crossover
+        :param n_points: an int representing the number of points to crossover
+        """
+        pass
+
+    def uniform(self):
+        """
+        Function to apply uniform crossover
+        """
+        pass
 
 
 
