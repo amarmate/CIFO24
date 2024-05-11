@@ -1,4 +1,4 @@
-from Algorithms.sudoku import Sudoku
+from Objects.sudoku import Sudoku
 import numpy as np
 
 class Individual(Sudoku):

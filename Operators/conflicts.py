@@ -12,7 +12,7 @@ def row_conflicts(board, position):
     return N - len(np.unique(row_values))
 
 
-def column_conflicts(board, position):
+def col_conflicts(board, position):
     """
     Function to get the number of conflicts in a column
     :param position: a tuple representing the coordinates of a number inside the column, or int representing the column number

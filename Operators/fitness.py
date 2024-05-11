@@ -1,5 +1,5 @@
 import numpy as np
-from Operators.conflicts import row_conflicts, column_conflicts, box_conflicts
+from Operators.conflicts import row_conflicts, col_conflicts, box_conflicts
 
 def fitness(board : np.ndarray):
     """
@@ -10,6 +10,6 @@ def fitness(board : np.ndarray):
     N = board.shape[0]
     
     row_sum = np.sum([row_conflicts(board, i) for i in range(N)])
-    column_sum = np.sum([column_conflicts(board, i) for i in range(N)])
+    column_sum = np.sum([col_conflicts(board, i) for i in range(N)])
     box_sum = np.sum([box_conflicts(board, i) for i in range(N)])
     return row_sum + column_sum + box_sum

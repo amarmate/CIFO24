@@ -1,5 +1,5 @@
 import numpy as np 
-from Algorithms.individual import Individual
+from Objects.individual import Individual
 
 class Population:
     """
