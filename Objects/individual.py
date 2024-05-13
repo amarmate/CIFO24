@@ -13,27 +13,6 @@ class Individual(Sudoku):
         """
 
         super().__init__(initial_board, board, fill_board, size, difficulty)
+        self.swappable_positions = self.initial_board == 0
         self.representation = self.board[self.swappable_positions]
         self.distribution = np.bincount(self.representation, minlength=self.N + 1)    
-        self.swappable_positions = self.initial_board == 0
-        
-    def mutate(self, mutation_rate : float = 0.1, swap_number : int = 5):
-        """
-        Function to mutate the individual, i.e. change the board randomly
-        :param mutation_rate: a float representing the probability of mutation
-        :param swap_number: an int representing the number of swaps to make in the board
-        """
-        # TODO: Do not mutate elite
-
-        if np.random.rand() < mutation_rate:
-            new_representation = self.representation.copy()
-            new_board = self.board.copy()
-
-            for i in range(swap_number):
-                x, y = np.random.choice(len(new_representation), 2, replace=False)
-                new_representation[x], new_representation[y] = new_representation[y], new_representation[x]
-
-            np.putmask(new_board, self.swappable_positions, new_representation)
-            return self.__class__(self.initial_board, new_board)
-        else:
-            return self

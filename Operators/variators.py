@@ -1,37 +1,24 @@
 import numpy as np 
 
 
-def crossover(board1, board2): 
-    """Function to do crossover between two boards
+def single_crossover(sudoku1, sudoku2): 
+    """Function to do crossover between two sudokus
     Args:
-        board1: np.array
-        board2: np.array
+        sudoku1: Sudoku object
+        sudoku2: Sudoku object
     Returns:
-        tuple with 2 np.arrays with the new boards
+        tuple with 2 boards with the new sudokus
     """
-    pass
+    # Assert that sudoku1.swappable exists
+    assert hasattr(sudoku1, 'swappable') and hasattr(sudoku2, 'swappable'), "The sudoku objects have to have a swappable attribute"
+    parent1, parent2 = sudoku1.swappable, sudoku2.swappable
+    initial_board = sudoku1.initial_board
+    point = np.random.randint(1, parent1.shape[0] - 1)
+    child1 = np.concatenate((parent1[:point], parent2[point:]))
+    child2 = np.concatenate((parent2[:point], parent1[point:]))
 
+    # Add the child1 numbers on top of the initial board's 0s 
+    board1 = np.putmask(initial_board.copy(), initial_board == 0, child1)
+    board2 = np.putmask(initial_board.copy(), initial_board == 0, child2)
 
-def mutate(board, swappable_positions, mutation_rate : float = 0.1, swap_number : int = 1):
-    """
-    Function to mutate a board, i.e. change the board randomly
-    :param board: the board to mutate as a numpy array
-    :param mutation_rate: a float representing the probability of mutation
-    :param swap_number: an int representing the number of swaps to make in the board
-
-    Returns:
-        A new board with the mutation applied, in the form of an numpy array
-    """
-
-    if np.random.rand() < mutation_rate:
-        mutated_board = board.copy()
-        np.random.shuffle(swappable_positions)
-        for i in range(swap_number):
-            # Randomly select two swappable positions
-            mutated_board[swappable_positions[2 * i]], mutated_board[swappable_positions[2 * i + 1]] = (
-                mutated_board[swappable_positions[2 * i + 1]],
-                mutated_board[swappable_positions[2 * i]],
-                )
-        return mutated_board
-    else:
-        return board
+    return board1, board2

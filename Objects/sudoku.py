@@ -3,10 +3,11 @@ from operator import attrgetter
 from Algorithms.search import hill_climbing 
 from Operators.fitness import fitness
 from Operators.board_generator import difficulty_function
+from copy import deepcopy
 
 class Sudoku:
     def __init__(self, initial_board : np.ndarray = None, board : np.ndarray = None, fill_board : str = 'random', size : int = 9, difficulty : int = 50, fitness_function = fitness,
-                 hill_climbing_args = {}, diff_function = difficulty_function):
+                 hill_climbing_args = {'max_iterations':100000, 'plateau_threshold':10000, 'num_neighbours': 10}, diff_function = difficulty_function):
         """
         Constructor for the sudoku class
         :param initial_board: an NxN numpy array representing the initial state of the board, where N has to be a perfect square. 0s represent empty cells
@@ -15,7 +16,7 @@ class Sudoku:
         :param size: an int representing the size of the board
         :param difficulty: an int representing the number of numbers to remove, from 0 to 100, where 0 is the easiest and 100 is the hardest
         :param fitness_function: a function to calculate the fitness of the individual
-        :param hill_climbing_args: a dictionary with the arguments to pass to the hill climbing algorithm : {'max_iterations': 1000, 'num_neighbours': 1, 'swap_number': 1, 'plateau_threshold': 100, 'verbose': False}
+        :param hill_climbing_args: a dictionary with the arguments to pass to the hill climbing algorithm : {'max_iterations': 1000, 'num_neighbours': 1, 'swap_number': 1, 'plateau_threshold': 100, 'verbose': 0}
         :param diff_function: a function to calculate the difficulty of the board
         """
         
@@ -41,6 +42,11 @@ class Sudoku:
         self.swappable_positions = list(zip(*np.where(self.initial_board == 0)))
         self.fitness = fitness_function(self.board)
 
+        # Other attributes for crossover
+        self.swap_points = self.initial_board == 0
+        self.swappable = self.board[self.swap_points]
+
+
     
     def generate_board(self, diff_function, size, difficulty, hill_climbing_args):
         """
@@ -58,7 +64,9 @@ class Sudoku:
 
         # Remove numbers from the board
         # filled_sudoku.remove_numbers(diff_function, difficulty)
-        # self = filled_sudoku
+        
+        self.initial_board = filled_sudoku.board
+
 
     def remove_numbers(self, diff_function, difficulty : int = 50):
         """
@@ -77,9 +85,9 @@ class Sudoku:
         # Recursively call the function to remove numbers
         self.remove_numbers(diff_function, difficulty)
 
+
+
             
-
-
     def fill_board(self, mode : str = 'random'):
         """
         Function to fill in the empty cells (0s) in the board, ensuring that the board is still valid, i.e. no more that 9 of the same number in the board
@@ -109,6 +117,9 @@ class Sudoku:
         self.board = flat_board.reshape(self.N, self.N)
 
 
+
+    # ------------------------- Algorithmic methods --------------------------------------------------
+
     def get_neighbours(self, number_of_neighbours : int = 1, swap_number : int = 1):
         """
         Function to get the neighbours of the individual
@@ -126,6 +137,15 @@ class Sudoku:
             neighbour_individual = Sudoku(self.initial_board, neighbour)
             neighbours.append(neighbour_individual)
         return neighbours
+
+    def mutate(self, mut_prob : float,  swap_number : int = 1):
+        """
+        Function to mutate the individual, i.e. change the board randomly
+        :param mut_prob: a float representing the probability of mutation
+        :param swap_number: an int representing the number of swaps to make in the board
+        """
+        return self.get_neighbours(number_of_neighbours=1, swap_number=swap_number)[0] if np.random.rand() < mut_prob else self
+
 
     # ------------------------- Logic methods --------------------------------------------------
         
@@ -157,7 +177,7 @@ class Sudoku:
     def __setitem__(self, position, value):
         # Check if the position is a tuple of length 2
         assert len(position) == 2, "The position has to be a tuple of length 2"
-        self.representation[position] = value
+        self.board[position] = deepcopy(value)
 
     def __repr__(self):
         return str(self.board)
