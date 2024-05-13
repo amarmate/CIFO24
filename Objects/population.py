@@ -132,8 +132,8 @@ class Population:
         if type == 'single_point':
             self.single_point(prob)
 
-        if type == 'single_point_2':
-            return self.single_point_2()
+        if type == 'multi_point':
+            return self.multi_point(prob)
 
         elif type == 'pmxc':
             self.pmx_crossover()
@@ -145,101 +145,150 @@ class Population:
         """
         Function to apply single point crossover
         """
-        #VERY BAD CODING PRACTICE
-        # TODO: Fix this
-        population_array = np.array([i.swappable for i in self.individuals])
-            
-        # Get the number of parents and the shape of each parent
-        num_parents = len(self)
-        rows, cols = population_array.shape
-
-        # Sample how many crossovers to do
-        num_crossovers = sum(np.random.choice([0,1], size = int(num_parents/2), replace=True, p=[1-prob, prob]))
-
-        # Select two random parents for each offspring without replacement
-        parent_indices = np.random.choice(num_parents, size=(num_crossovers,2), replace=False)
-
-        # Choose random crossover points for each pair of parents
-        crossover_points = np.random.randint(cols-1, size=num_crossovers)
-
-        # Matrices with parents from both sides
-        parent1 = population_array[parent_indices[:, 0]]
-        parent2 = population_array[parent_indices[:, 1]]
-
-        # Mask all the values that are above/below crossover line with zeros
-        parent1_masked = np.ma.masked_array(parent1, np.arange(cols) > crossover_points[:, np.newaxis]).filled(0)
-        parent2_masked = np.ma.masked_array(parent2, np.arange(cols) <= crossover_points[:, np.newaxis]).filled(0)
-
-        # offsprings are just sum of parents
-        offspring1 = parent1_masked + parent2_masked
-        offspring2 = (parent1 - parent1_masked) + (parent2 - parent2_masked)
-
-        offspring = np.concatenate((offspring1, offspring2))
-
-        # Put parents that didn't get crossovered back into the population
-        if num_crossovers < num_parents:
-            left_ind = np.setdiff1d(np.arange(num_parents), parent_indices.flatten())
-            offspring = np.concatenate((offspring, population_array[left_ind]))
-
-
-        # Append random offsprings from parents until we reach population size
-        if offspring.shape[0] < num_parents:
-            while offspring.shape[0] < num_parents:
-                offspring = np.append(offspring, 
-                                    np.expand_dims(population_array[np.random.choice(len(population_array))], axis=0), axis = 0)
+        if prob == 0:
+            pass
+        else:
+            population_array = np.array([i.swappable for i in self.individuals])
                 
-        if keep_distribution:
+            # Get the number of parents and the shape of each parent
+            num_parents = len(self)
+            rows, cols = population_array.shape
 
-            perfect_distribution = np.tile(self.individuals[0].distribution, len(offspring))
-            real_distribution = np.apply_along_axis(lambda row: np.bincount(row, minlength=10), axis=1, arr=offspring)
-            difference = perfect_distribution - real_distribution
+            # Sample how many crossovers to do
+            num_crossovers = sum(np.random.choice([0,1], size = int(num_parents/2), replace=True, p=[1-prob, prob]))
 
-        
-        # Put the offsprings into the population
-        for i in range(len(self)):
-            swappable = offspring[i]
-            board = deepcopy(self.individuals[i].board)
-            np.putmask(board, self.individuals[i].swap_points, swappable)
-            self.individuals[i] = Sudoku(initial_board=self.individuals[i].initial_board, board=board)
+            # Select two random parents for each offspring without replacement
+            parent_indices = np.random.choice(num_parents, size=(num_crossovers,2), replace=False)
+
+            # Choose random crossover points for each pair of parents
+            crossover_points = np.random.randint(cols-1, size=num_crossovers)
+
+            # Matrices with parents from both sides
+            parent1 = population_array[parent_indices[:, 0]]
+            parent2 = population_array[parent_indices[:, 1]]
+
+            # Mask all the values that are above/below crossover line with zeros
+            parent1_masked = np.ma.masked_array(parent1, np.arange(cols) > crossover_points[:, np.newaxis]).filled(0)
+            parent2_masked = np.ma.masked_array(parent2, np.arange(cols) <= crossover_points[:, np.newaxis]).filled(0)
+
+            # offsprings are just sum of parents
+            offspring1 = parent1_masked + parent2_masked
+            offspring2 = (parent1 - parent1_masked) + (parent2 - parent2_masked)
+
+            offspring = np.concatenate((offspring1, offspring2))
+
+            # Put parents that didn't get crossovered back into the population
+            if num_crossovers < num_parents:
+                left_ind = np.setdiff1d(np.arange(num_parents), parent_indices.flatten())
+                offspring = np.concatenate((offspring, population_array[left_ind]))
 
 
-    def single_point_2(self, elitism : bool = False):
+            # Append random offsprings from parents until we reach population size
+            if offspring.shape[0] < num_parents:
+                while offspring.shape[0] < num_parents:
+                    offspring = np.append(offspring, 
+                                        np.expand_dims(population_array[np.random.choice(len(population_array))], axis=0), axis = 0)
+                    
+            if keep_distribution:
+
+                perfect_distribution = np.tile(self.individuals[0].distribution, len(offspring))
+                real_distribution = np.apply_along_axis(lambda row: np.bincount(row, minlength=10), axis=1, arr=offspring)
+                difference = perfect_distribution - real_distribution
+
+            
+            # Put the offsprings into the population
+            for i in range(len(self)):
+                swappable = offspring[i]
+                board = deepcopy(self.individuals[i].board)
+                np.putmask(board, self.individuals[i].swap_points, swappable)
+                self.individuals[i] = Sudoku(initial_board=self.individuals[i].initial_board, board=board)
+
+
+    def multi_point(self, elitism : bool = False, 
+                    num_points : int = 3, 
+                    prob : float = 0.5, 
+                    keep_distribution : bool = False):
         """
-        Function to apply single point crossover
+        Function to apply multi point crossover
         """
-        elite = deepcopy(self.get_best_individual())
-        print('Single Point:', elite.fitness)
-        # Enumerate all the parents two by two 
+        if prob == 0:
+            pass
+        else:
+            population_array = np.array([i.swappable for i in self.individuals])
+                
+            # Get the number of parents and the shape of each parent
+            num_parents = len(self)
+            rows, cols = population_array.shape
 
-        offspring = []
+            # Sample how many crossovers to do
+            num_crossovers = sum(np.random.choice([0,1], size = int(num_parents/2), replace=True, p=[1-prob, prob]))
 
-        # CHANGE THIS TODO
-        for i in range(0, len(self), 2):
-            parent1 = self[i]
-            parent2 = self[i+1]
-            child1, child2 = single_crossover(parent1, parent2)
-            offspring.append(Sudoku(initial_board=parent1.initial_board, board=child1))
-            offspring.append(Sudoku(initial_board=parent1.initial_board, board=child2))
+            # Select two random parents for each offspring without replacement
+            parent_indices = np.random.choice(num_parents, size=(num_crossovers,2), replace=False)
 
-        if elitism:
-            print('elite', elite)
-            offspring[0] = elite
-            print('self ind', offspring[0])
+            # Choose random crossover points for each pair of parents
+            crossover_points = np.random.randint(cols-1, size=num_crossovers)
 
-        return offspring
+            # Matrices with parents from both sides
+            parent1 = population_array[parent_indices[:, 0]]
+            parent2 = population_array[parent_indices[:, 1]]
+
+            #Define crossoverpoints
+            crossover_points = np.random.randint(cols-1, size=(num_crossovers,num_points))
+            crossover_points.sort(axis=1)
+            last_index = np.array([cols]*num_crossovers).reshape(-1,1)
+            crossover_points = np.hstack((crossover_points, last_index))
+
+            # Create mask
+            total_mask = []
+            for crossover_line in crossover_points:
+                mask_line = np.zeros(cols).astype(bool)
+                for j in range(int(num_points/2)):
+                    mask_line[np.arange(crossover_line[j*2], crossover_line[(j+1)*2])] = True
+                total_mask.append(mask_line)
+            total_mask = np.array(total_mask)
+
+            # Mask all the values that are above/below crossover line with zeros
+            parent1_masked = np.ma.masked_array(parent1, total_mask).filled(0)
+            parent2_masked = np.ma.masked_array(parent2, total_mask == False).filled(0)
+
+            # offsprings are just sum of parents
+            offspring1 = parent1_masked + parent2_masked
+            offspring2 = (parent1 - parent1_masked) + (parent2 - parent2_masked)
+
+            offspring = np.concatenate((offspring1, offspring2))
+
+            # Put parents that didn't get crossovered back into the population
+            if num_crossovers < num_parents:
+                left_ind = np.setdiff1d(np.arange(num_parents), parent_indices.flatten())
+                offspring = np.concatenate((offspring, population_array[left_ind]))
+
+
+            # Append random offsprings from parents until we reach population size
+            if offspring.shape[0] < num_parents:
+                while offspring.shape[0] < num_parents:
+                    offspring = np.append(offspring, 
+                                        np.expand_dims(population_array[np.random.choice(len(population_array))], axis=0), axis = 0)
+                    
+            if keep_distribution:
+
+                perfect_distribution = np.tile(self.individuals[0].distribution, len(offspring))
+                real_distribution = np.apply_along_axis(lambda row: np.bincount(row, minlength=10), axis=1, arr=offspring)
+                difference = perfect_distribution - real_distribution
+
+            
+            # Put the offsprings into the population
+            for i in range(len(self)):
+                swappable = offspring[i]
+                board = deepcopy(self.individuals[i].board)
+                np.putmask(board, self.individuals[i].swap_points, swappable)
+                self.individuals[i] = Sudoku(initial_board=self.individuals[i].initial_board, board=board)
     
     
     def pmx_crossover(self):
         """
         Function to apply partially mapped crossover
         """
-
-    def multi_point(self, n_points : int = 2):
-        """
-        Function to apply multi point crossover
-        :param n_points: an int representing the number of points to crossover
-        """
-        pass
 
     def uniform(self):
         """
