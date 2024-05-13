@@ -46,6 +46,9 @@ class Sudoku:
         self.swap_points = self.initial_board == 0
         self.swappable = self.board[self.swap_points]
 
+        # To compare later with initial distribution
+        self.distribution = np.bincount(self.swappable, minlength=self.N + 1)
+
 
     
     def generate_board(self, diff_function, size, difficulty, hill_climbing_args):

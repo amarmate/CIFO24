@@ -28,7 +28,11 @@ class Population:
             self.individuals.append(Sudoku(initial_board, **sudoku_arguments))
 
 
-    def evolve(self, gens, xo_prob, mut_prob, select_type, xo, elite_size : int = 1, mutation='change', swap_number : int = 1, keep_distribution=False):
+    def evolve(self, gens, xo_prob, mut_prob, select_type, xo, 
+               elite_size : int = 1, 
+               mutation='change', 
+               swap_number : int = 1, 
+               keep_distribution=False):
         assert elite_size <= self.size, "The number of elite individuals has to be less than the population size"
         assert elite_size >= 0, "The number of elite individuals has to be greater than 0"
 
@@ -50,6 +54,11 @@ class Population:
 
             mean_fitness = np.mean([ind.fitness for ind in self.individuals])
             print(f"Best individual of gen #{i + 1}: {min([ind.fitness for ind in self.individuals])}. Mean fitness: {mean_fitness}")
+
+            if self.get_best_individuals(1)[0].fitness == 0:
+                print(f"Solution found in generation {i + 1}!")
+                self.get_best_individuals(1)[0].display()
+                break
 
     # -------------------------------------------------------------------------------------------------------
     
@@ -85,7 +94,7 @@ class Population:
         remove = np.where(difference > 0, 0, -difference)
         for i in range(len(self)):
             if np.sum(remove[i]) > 0:
-                # print('Iteration ', i, ' Before ', self[i].swappable)
+                print('Iteration ', i, ' Before ', self[i].swappable)
                 a = self[i].swappable
                 values_add = np.repeat(numbers[i], add[i], axis=0)
                 np.random.shuffle(values_add)
@@ -100,10 +109,10 @@ class Population:
                                                                 replace=False) for val in counts.keys()])
                 self[i].swappable[indices_to_mask] = 0
                 np.putmask(self[i].swappable, self[i].swappable == 0, values_add)
-                # print('Iteration ', i, ' After ',self[i].swappable)
+                print('Iteration ', i, ' After ',self[i].swappable)
                 perfect_distribution = np.tile(self[0].distribution, (len(self), 1))
                 real_distribution = np.apply_along_axis(lambda row: np.bincount(row, minlength=self[0].N + 1), axis=1, arr=[self[i].swappable for i in range(len(self))])
-                difference1 = perfect_distribution - real_distribution
+                print(perfect_distribution, real_distribution)
             else:
                 pass
         
