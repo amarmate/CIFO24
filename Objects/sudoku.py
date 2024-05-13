@@ -137,14 +137,33 @@ class Sudoku:
             neighbour_individual = Sudoku(self.initial_board, neighbour)
             neighbours.append(neighbour_individual)
         return neighbours
-
-    def mutate(self, mut_prob : float,  swap_number : int = 1):
+    
+    def mutate(self, mut_prob : float, n_changes : int = 1, mutation : str = 'swap'): 
         """
-        Function to mutate the individual, i.e. change the board randomly
+        Function to mutate the individual, i.e. change the board randomly, by changing n_changes numbers in the board
         :param mut_prob: a float representing the probability of mutation
-        :param swap_number: an int representing the number of swaps to make in the board
+        :param n_changes: an int representing the number of swaps to make in the board
+        :param mutation: a string representing the type of mutation. Can be 'swap' or 'change'
         """
-        return self.get_neighbours(number_of_neighbours=1, swap_number=swap_number)[0] if np.random.rand() < mut_prob else self
+
+        if mutation == 'swap':
+            return self.get_neighbours(number_of_neighbours=1, swap_number=n_changes)[0] if np.random.rand() < mut_prob else self
+        
+        elif mutation == 'change':
+            if np.random.rand() > mut_prob:
+                return self
+            neighbour = self.board.copy()
+            np.random.shuffle(self.swappable_positions)
+            for i in range(n_changes):
+                new_number = np.random.randint(1, self.N + 1)
+                # Randomly select two swappeable positions 
+                neighbour[self.swappable_positions[i]] = new_number                 
+            return Sudoku(self.initial_board, neighbour)
+        
+        else: 
+            print('Warning ! Mutation not recognized. Returning the individual without mutation')
+            return self
+
 
 
     # ------------------------- Logic methods --------------------------------------------------

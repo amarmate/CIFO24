@@ -28,40 +28,38 @@ class Population:
             self.individuals.append(Sudoku(initial_board, **sudoku_arguments))
 
 
-    def evolve(self, gens, xo_prob, mut_prob, select_type, xo, elitism, swap_number : int = 1, keep_distribution=False):
+    def evolve(self, gens, xo_prob, mut_prob, select_type, xo, elite_size : int = 1, mutation='change', swap_number : int = 1, keep_distribution=False):
+        assert elite_size <= self.size, "The number of elite individuals has to be less than the population size"
+        assert elite_size >= 0, "The number of elite individuals has to be greater than 0"
 
         for i in range(gens):
-            print('bf selection')
-            self.get_best_individual()
-            # selection
-            self.selection(select_type)
-            print('after selection')
-            self.get_best_individual()
-            # crossover
-            self.crossover(type=xo, prob=xo_prob, elitism=elitism)
-            print('after xo')
-            self.get_best_individual()
+            if elite_size > 0:
+                best_individuals = self.get_best_individuals(elite_size)
 
+            self.selection(select_type)
+            self.crossover(type=xo, prob=xo_prob)
             for j in range(len(self.individuals)):
-                self[j] = self[j].mutate(mut_prob, swap_number)
+                self[j] = self[j].mutate(mut_prob, swap_number, mutation=mutation)
 
             if keep_distribution:
                 self.keep_distribution()
 
-            print(f"Best individual of gen #{i + 1}: {min([ind.fitness for ind in self.individuals])}")
+            if elite_size > 0:
+                for j in range(elite_size):
+                    self[j] = best_individuals[j]
 
-            print('--------------------------- \ ---------------------------')
+            mean_fitness = np.mean([ind.fitness for ind in self.individuals])
+            print(f"Best individual of gen #{i + 1}: {min([ind.fitness for ind in self.individuals])}. Mean fitness: {mean_fitness}")
 
     # -------------------------------------------------------------------------------------------------------
     
-    def get_best_individual(self):
+    def get_best_individuals(self, n : int = 1):
         """
         Function to get the best individual of the population
+        :param n: an int representing the number of best individuals to get
         """
-        print('Fitnesses:', [ind.fitness for ind in self.individuals])
-        print('Best individual:', min([ind.fitness for ind in self.individuals]))
-        best_individual = min(self.individuals, key=lambda x: x.fitness)
-        return best_individual
+        best_individuals = sorted(self.individuals, key=lambda x: x.fitness)[:n]
+        return best_individuals
 
     def __getitem__(self, position):
         return self.individuals[position]
@@ -108,36 +106,7 @@ class Population:
                 difference1 = perfect_distribution - real_distribution
             else:
                 pass
-
-
-    def selection(self, type : str = 'roulette'):
-        """
-        Function to select the individuals in the population
-        :param type: a string representing the type of selection to apply
-        """
-        if type == 'roulette':
-            self.roulette()
-
         
-
-    def crossover(self, type : str = 'single_point', prob : float = 0.5, elitism : bool = False):
-        """
-        Function to crossover the individuals in the population
-        :param type: a string representing the type of crossover to apply
-        """
-
-        if type == 'single_point':
-            self.single_point(prob, elitism=elitism)
-
-        if type == 'single_point_2':
-            return self.single_point_2(elitism=elitism)
-
-        elif type == 'pmxc':
-            self.pmx_crossover()
-
-        elif type == 'uniform':
-            self.uniform()
-
 
     def diversity(self):
         """
@@ -147,15 +116,29 @@ class Population:
 
 
 
-    # ------------------------------------ Selection ------------------------------------------------
-            
+    # ------------------------------------ Crossover ------------------------------------------------
+    def crossover(self, type : str = 'single_point', prob : float = 0.5, elitism : bool = False):
+        """
+        Function to crossover the individuals in the population
+        :param type: a string representing the type of crossover to apply
+        """
 
-    def single_point(self, prob : float = 0.5, elitism : bool = False, keep_distribution : bool = False):
+        if type == 'single_point':
+            self.single_point(prob)
+
+        if type == 'single_point_2':
+            return self.single_point_2()
+
+        elif type == 'pmxc':
+            self.pmx_crossover()
+
+        elif type == 'uniform':
+            self.uniform()
+
+    def single_point(self, prob : float = 0.5, keep_distribution : bool = False):
         """
         Function to apply single point crossover
         """
-        # TODO: Add elitism
-
         #VERY BAD CODING PRACTICE
         # TODO: Fix this
         population_array = np.array([i.swappable for i in self.individuals])
@@ -208,18 +191,10 @@ class Population:
         
         # Put the offsprings into the population
         for i in range(len(self)):
-            # Put elite as a first element
-            if elitism and i == 0:
-                board = deepcopy(self.get_best_individual().board)
-                self.individuals[i] = Sudoku(initial_board=self.individuals[i].initial_board, board=board)
-
-                # self.individuals[i].swappable = self.get_best_individual().swappable
-                # np.putmask(self.individuals[i].board, self.individuals[i].swap_points, self.individuals[i].swappable)
-            else:
-                swappable = offspring[i]
-                board = deepcopy(self.individuals[i].board)
-                np.putmask(board, self.individuals[i].swap_points, swappable)
-                self.individuals[i] = Sudoku(initial_board=self.individuals[i].initial_board, board=board)
+            swappable = offspring[i]
+            board = deepcopy(self.individuals[i].board)
+            np.putmask(board, self.individuals[i].swap_points, swappable)
+            self.individuals[i] = Sudoku(initial_board=self.individuals[i].initial_board, board=board)
 
 
     def single_point_2(self, elitism : bool = False):
@@ -246,23 +221,8 @@ class Population:
             print('self ind', offspring[0])
 
         return offspring
-
     
-    def roulette(self):
-        """
-        Function to apply roulette selection
-        """
-
-        # Calculate the fitness of each individual, total fitness and probs
-        fitnesses = [1/(individual.fitness+0.000001) for individual in self.individuals]
-        total_fitness = sum(fitnesses)
-        probabilities = [fitness / total_fitness for fitness in fitnesses]
-        probabilities_std = [prob / sum(probabilities) for prob in probabilities]
-        
-        # Select the individuals using roulette wheel
-        self.individuals = np.random.choice(self.individuals, size=self.size, p=probabilities_std, replace=True)
-
-        
+    
     def pmx_crossover(self):
         """
         Function to apply partially mapped crossover
@@ -281,7 +241,46 @@ class Population:
         """
         pass
 
+    # ------------------------------------ Selection ------------------------------------------------
+    def selection(self, type : str = 'roulette', diversify : str = None):
+        """
+        Function to select the individuals in the population
+        :param type: a string representing the type of selection to apply
+        :param diversify: a string representing the type of diversification to apply, choose between 'fitness-sharing' and 'restricted-mating'
+        """
+        if type == 'roulette':
+            self.roulette(diversify=diversify)
 
+        if type == 'tournament':
+            self.tournament()
+
+        if type == 'rank':
+            self.rank()
+    
+    def roulette(self, diversify : str = None):
+        """
+        Function to apply roulette selection
+        :param diversify: a string representing the type of diversification to apply, choose between 'fitness-sharing' and 'restricted-mating'
+        """
+
+        # Calculate the fitness of each individual, total fitness and probs
+        if diversify is None:
+            fitnesses = [1/(individual.fitness+0.000001) for individual in self.individuals]
+        elif diversify == 'fitness-sharing':
+            fitnesses = []
+        elif diversify == 'restricted-mating':
+            fitnesses = []
+        
+        total_fitness = sum(fitnesses)
+        probabilities = [fitness / total_fitness for fitness in fitnesses]
+        probabilities_std = [prob / sum(probabilities) for prob in probabilities]
+        
+        # Select the individuals using roulette wheel
+        self.individuals = np.random.choice(self.individuals, size=self.size, p=probabilities_std, replace=True)
+        
+
+
+    # ------------------------------------ Dunder methods ------------------------------------------------
     def __len__(self):
         return len(self.individuals)
 
