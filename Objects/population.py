@@ -92,10 +92,10 @@ class Population:
         numbers = np.tile(np.indices(difference[0].shape)[0], (len(self) + 1,1))
         add = np.where(difference < 0, 0, difference)
         remove = np.where(difference > 0, 0, -difference)
+
         for i in range(len(self)):
             if np.sum(remove[i]) > 0:
-                print('Iteration ', i, ' Before ', self[i].swappable)
-                a = self[i].swappable
+
                 values_add = np.repeat(numbers[i], add[i], axis=0)
                 np.random.shuffle(values_add)
                 values_remove = np.repeat(numbers[i], remove[i], axis=0)
@@ -107,12 +107,9 @@ class Population:
                 indices_to_mask = np.concatenate([np.random.choice(np.flatnonzero(mask & (self[i].swappable == val)), 
                                                                 size=counts[val], 
                                                                 replace=False) for val in counts.keys()])
-                self[i].swappable[indices_to_mask] = 0
-                np.putmask(self[i].swappable, self[i].swappable == 0, values_add)
-                print('Iteration ', i, ' After ',self[i].swappable)
-                perfect_distribution = np.tile(self[0].distribution, (len(self), 1))
-                real_distribution = np.apply_along_axis(lambda row: np.bincount(row, minlength=self[0].N + 1), axis=1, arr=[self[i].swappable for i in range(len(self))])
-                print(perfect_distribution, real_distribution)
+                
+                # Put new values on these positions
+                self[i].swappable[indices_to_mask] = values_add
             else:
                 pass
         
