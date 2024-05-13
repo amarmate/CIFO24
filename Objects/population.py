@@ -283,7 +283,25 @@ class Population:
         
         # Select the individuals using roulette wheel
         self.individuals = np.random.choice(self.individuals, size=self.size, p=probabilities_std, replace=True)
-        
+    
+    def tournament(self, tournament_size : int = 3):
+        """
+        Function to apply tournament selection
+        """
+
+        # Define tournament
+        tournament = np.random.choice(self.individuals, size=(self.size, tournament_size), replace=True)
+
+        # Keep all fitnesses
+        fitnesses = np.array([np.array([ind.fitness for ind in subarray]) for subarray in tournament])
+
+        # Find best in each of the tournaments
+        min_indices = np.argmin(fitnesses, axis=1)
+        row_indices = np.arange(min_indices.size)[:, None]
+        col_indices = min_indices[:, None]
+
+        # Reassign individuals
+        self.individuals = tournament[row_indices, col_indices].flatten().tolist()
 
 
     # ------------------------------------ Dunder methods ------------------------------------------------
