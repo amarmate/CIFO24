@@ -1,6 +1,6 @@
 import numpy as np
 from operator import attrgetter
-from Algorithms.search import hill_climbing 
+from Algorithms.search import Hill_climbing
 from Operators.fitness import fitness
 from Operators.board_generator import difficulty_function
 from copy import deepcopy
@@ -62,7 +62,7 @@ class Sudoku:
 
         # Generate a solved board 
         sudoku = Sudoku(initial_board=np.zeros((size,size), dtype=int), fill_board='random')
-        filled_sudoku = hill_climbing(sudoku, **hill_climbing_args)
+        filled_sudoku = Hill_climbing(sudoku).run(**hill_climbing_args)
         assert filled_sudoku.fitness == 0, "The board could not be solved"
 
         # Remove numbers from the board
@@ -89,21 +89,16 @@ class Sudoku:
         self.remove_numbers(diff_function, difficulty)
 
 
-
-            
     def fill_board(self, mode : str = 'random'):
         """
         Function to fill in the empty cells (0s) in the board, ensuring that the board is still valid, i.e. no more that 9 of the same number in the board
-        :param mode: a string representing how to fill the board. Can be 'random', 'logic-random' and None
+        :param mode: a string representing how to fill the board. Can be 'random' or 'logic-random'
         """
-        assert mode in ['random', 'logic-random', None], "The mode has to be 'random', 'logic-random' or None"
+        assert mode in ['random', 'logic-random'], "The mode has to be 'random' or 'logic-random'"
 
         if mode == 'logic-random':
             self.fill_board_logic()
-        
-        if mode == None:
-            return
-        
+                
         # Randomly fill-in the rest of the board
         flat_board = self.initial_board.copy().flatten()
 
@@ -166,11 +161,6 @@ class Sudoku:
         else: 
             print('Warning ! Mutation not recognized. Returning the individual without mutation')
             return self
-
-
-
-    # ------------------------- Logic methods --------------------------------------------------
-        
 
     # ------------------------- Other methods --------------------------------------------------
 

@@ -61,22 +61,6 @@ class Population:
                 break
 
     # -------------------------------------------------------------------------------------------------------
-    
-    def get_best_individuals(self, n : int = 1):
-        """
-        Function to get the best individual of the population
-        :param n: an int representing the number of best individuals to get
-        """
-        best_individuals = sorted(self.individuals, key=lambda x: x.fitness)[:n]
-        return best_individuals
-
-    def __getitem__(self, position):
-        return self.individuals[position]
-    
-    def __setitem__(self, position, value):
-        self.individuals[position] = deepcopy(value)
-
-    
     def keep_distribution(self):
         """
         Function to keep the correct distribution of numbers inside each individual 
@@ -112,7 +96,29 @@ class Population:
                 self[i].swappable[indices_to_mask] = values_add
             else:
                 pass
+
+    # TODO too harsh normalization 
+    def get_distances(self, normalize : bool = True):
+        """
+        Function to get the distance matrix between individuals
+        :param normalize: a boolean to normalize the distances
+        Returns:
+            np.ndarray: a 2D numpy array with the sum of all distances between one individual and all the others
+        """
+        individuals = np.array([ind.swappable for ind in self.individuals])
+        def get_distance(i):
+            diff = individuals[i] != individuals
+            diff[i, :] = False
+            return np.sum(np.sum(diff, axis=1))
         
+        distances = np.array([get_distance(i) for i in range(len(self))])  
+
+        if normalize:
+            distances = (distances - np.min(distances)) / (np.max(distances) - np.min(distances))
+        return distances
+        
+
+
 
     def diversity(self):
         """
@@ -322,7 +328,11 @@ class Population:
         if diversify is None:
             fitnesses = [1/(individual.fitness+0.000001) for individual in self.individuals]
         elif diversify == 'fitness-sharing':
-            fitnesses = []
+            # Get the distances between individuals
+            distances = self.get_distances(normalize=True)
+            fitnesses = [1/(individual.fitness+0.000001) for individual in self.individuals]
+            # The larger the distance, the better the fitness
+            fitnesses = [fitness * distances[i] for i, fitness in enumerate(fitnesses)]
         elif diversify == 'restricted-mating':
             fitnesses = []
         
@@ -353,9 +363,23 @@ class Population:
         self.individuals = tournament[row_indices, col_indices].flatten().tolist()
 
 
-    # ------------------------------------ Dunder methods ------------------------------------------------
+    # ------------------------------------ Dunder and get methods ------------------------------------------------
     def __len__(self):
         return len(self.individuals)
+    
+    def get_best_individuals(self, n : int = 1):
+        """
+        Function to get the best individual of the population
+        :param n: an int representing the number of best individuals to get
+        """
+        best_individuals = sorted(self.individuals, key=lambda x: x.fitness)[:n]
+        return best_individuals
+
+    def __getitem__(self, position):
+        return self.individuals[position]
+    
+    def __setitem__(self, position, value):
+        self.individuals[position] = deepcopy(value)
 
 
 # ------------------------- Main --------------------------------------------------
