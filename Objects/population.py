@@ -1,8 +1,10 @@
 import numpy as np 
+import pandas as pd
 from Objects.sudoku import Sudoku
 from Operators.variators import single_crossover
 from copy import deepcopy
 from Operators.fitness import fitness as fitness_function
+import matplotlib.pyplot as plt
 
 class Population:
     """
@@ -19,6 +21,11 @@ class Population:
         self.size = size
         self.individuals = []
 
+        # For the history of the population
+        self.history = {}
+        self.params = {}
+        self.gen = 0
+
         if initial_board is None:
             first_individual = Sudoku()
             initial_board = first_individual.initial_board
@@ -29,18 +36,22 @@ class Population:
 
 
     def evolve(self, gens, xo_prob, mut_prob, select_type, xo, 
+               diversify : str = None,
                elite_size : int = 1, 
                mutation='change', 
                swap_number : int = 1, 
                keep_distribution=False):
+        
         assert elite_size <= self.size, "The number of elite individuals has to be less than the population size"
         assert elite_size >= 0, "The number of elite individuals has to be greater than 0"
+
+        self.params = {'gens': gens, 'xo_prob': xo_prob, 'mut_prob': mut_prob, 'select_type': select_type, 'xo': xo, 'diversify': diversify, 'elite_size': elite_size, 'mutation': mutation, 'swap_number': swap_number, 'keep_distribution': keep_distribution}
 
         for i in range(gens):
             if elite_size > 0:
                 best_individuals = self.get_best_individuals(elite_size)
 
-            self.selection(select_type)
+            self.selection(select_type, diversify)
             self.crossover(type=xo, prob=xo_prob)
             for j in range(len(self.individuals)):
                 self[j] = self[j].mutate(mut_prob, swap_number, mutation=mutation)
@@ -52,8 +63,11 @@ class Population:
                 for j in range(elite_size):
                     self[j] = best_individuals[j]
 
-            mean_fitness = np.mean([ind.fitness for ind in self.individuals])
-            print(f"Best individual of gen #{i + 1}: {min([ind.fitness for ind in self.individuals])}. Mean fitness: {mean_fitness}")
+            best_individual_fitness = min([ind.fitness for ind in self.individuals])
+            print(f"Best individual of gen #{i + 1}: {best_individual_fitness}")
+
+            self.history[self.gen] = best_individual_fitness, self.phenotype_diversity(type='entropy'), self.genotype_diversity()
+            self.gen += 1
 
             if self.get_best_individuals(1)[0].fitness == 0:
                 print(f"Solution found in generation {i + 1}!")
@@ -118,13 +132,29 @@ class Population:
         return distances
         
 
-
-
-    def diversity(self):
+    def phenotype_diversity(self, type = 'entropy'):
         """
-        Function to calculate the diversity of the population
+        Function to calculate the phenotypic diversity of the population 
+        :param type: a string representing the type of diversity to calculate, choose between 'entropy' and 'variance'
         """
-        pass
+        assert type in ['entropy', 'variance'], "The type of diversity has to be either 'entropy' or 'variance'"
+        fitnesses = np.array([ind.fitness+0.000001 for ind in self.individuals])
+        if type == 'entropy':
+            diversity = -np.sum(fitnesses * np.log(fitnesses))
+        elif type == 'variance':
+            diversity = np.var(fitnesses)
+        return diversity
+    
+    def genotype_diversity(self):
+        """
+        Function to calculate the phenotypic diversity of the population 
+        :param type: a string representing the type of diversity to calculate, choose between 'entropy' and 'variance'
+        """
+        get_distances = self.get_distances(normalize=False)
+        diversity = np.mean(get_distances) / (self.size * len(self.individuals[0].swappable))
+        return diversity
+
+        
 
 
 
@@ -380,6 +410,46 @@ class Population:
     
     def __setitem__(self, position, value):
         self.individuals[position] = deepcopy(value)
+
+    def plot_history(self, genodiv = False, phenodiv = False, grid = False, info = False, ma_smooth_ratio = 0.05):
+        """
+        Function to plot the history of the population
+        Args:
+            genodiv (bool, optional): Whether to plot genotype diversity. Defaults to False.
+            phenodiv (bool, optional): Whether to plot phenotype diversity. Defaults to False.
+            grid (bool, optional): Whether to show a grid on the plot. Defaults to False.
+            info (bool, optional): Whether to show the parameters used in the evolution. Defaults to False.
+            ma_smooth_ratio (float, optional): Ratio of the moving average smoothing to the number of iterations. Defaults to 0.05.
+        """
+        assert ma_smooth_ratio > 0 and ma_smooth_ratio <= 1, "The moving average smoothing ratio has to be between 0 and 1"
+
+        if genodiv and phenodiv:
+            # Create two subplots
+            print("Warning! Both genotypic and phenotypic diversity cannot be plotted at the same time. Phenotypic will be ploted.")
+
+        fitness_plot = {iteration : v[0] for iteration, v in self.history.items()}
+        plt.plot(list(fitness_plot.keys()), list(fitness_plot.values()), label='Fitness')
+
+        # The pheno and geno have to be smoothed
+        diversity_df = pd.DataFrame(self.history).T
+        diversity_df = diversity_df.rolling(window=int(len(self.history) * ma_smooth_ratio)).mean()
+        if phenodiv:
+            ax2 = plt.twinx()
+            ax2.plot(list(diversity_df.index), diversity_df[1], label='Phenotypic diversity', color='red')
+        elif genodiv:
+            ax2 = plt.twinx()
+            ax2.plot(list(diversity_df.index), diversity_df[2], label='Genotypic diversity', color='red')
+    
+        if info:
+            plt.title(f"Evolution with parameters: {self.params}", fontsize=8)
+        else:
+            plt.title("Evolution")
+        plt.xlabel('Generation')
+        plt.ylabel('Diversity')
+        plt.legend()
+        plt.show()
+    
+        
 
 
 # ------------------------- Main --------------------------------------------------
