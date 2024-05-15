@@ -1,7 +1,6 @@
 import numpy as np 
 import pandas as pd
 from Objects.sudoku import Sudoku
-from Operators.variators import single_crossover
 from copy import deepcopy
 from Operators.fitness import fitness as fitness_function
 import matplotlib.pyplot as plt
@@ -35,12 +34,27 @@ class Population:
             self.individuals.append(Sudoku(initial_board, **sudoku_arguments))
 
 
-    def evolve(self, gens, xo_prob, mut_prob, select_type, xo, 
+    def evolve(self, gens : int = 1000, xo_prob : float = 0.7, mut_prob : float = 0.3, select_type : str = 'roulette', xo : str = 'single_point', 
                diversify : str = None,
                elite_size : int = 1, 
-               mutation='change', 
+               mutation : str ='change', 
                swap_number : int = 1, 
-               keep_distribution=False):
+               keep_distribution : bool =False, 
+               verbose : int = 0):
+        """
+        Function to evolve the population
+        :param gens: an int representing the number of generations to evolve
+        :param xo_prob: a float representing the probability of crossover
+        :param mut_prob: a float representing the probability of mutation
+        :param select_type: a string representing the type of selection to apply, choose between 'roulette', 'tournament', 'rank'
+        :param xo: a string representing the type of crossover to apply, choose between 'single_point', 'multi_point', 'pmxc', 'uniform'
+        :param diversify: a string representing the type of diversification to apply, choose between 'fitness-sharing' and 'restricted-mating'
+        :param elite_size: an int representing the number of elite individuals to keep
+        :param mutation: a string representing the type of mutation to apply
+        :param swap_number: an int representing the number of swaps to make in the board
+        :param keep_distribution: a boolean representing whether to keep the distribution of numbers in the board
+        :param verbose: an int representing the verbosity level of the evolution
+        """
         
         assert elite_size <= self.size, "The number of elite individuals has to be less than the population size"
         assert elite_size >= 0, "The number of elite individuals has to be greater than 0"
@@ -64,7 +78,7 @@ class Population:
                     self[j] = best_individuals[j]
 
             best_individual_fitness = min([ind.fitness for ind in self.individuals])
-            print(f"Best individual of gen #{i + 1}: {best_individual_fitness}")
+            print(f"Best individual of gen #{i + 1}: {best_individual_fitness}") if verbose >= 1 else None
 
             self.history[self.gen] = best_individual_fitness, self.phenotype_diversity(type='entropy'), self.genotype_diversity()
             self.gen += 1
@@ -114,7 +128,7 @@ class Population:
     # TODO too harsh normalization 
     def get_distances(self, normalize : bool = True):
         """
-        Function to get the distance matrix between individuals
+        Function to get the distance matrix between individuals, in terms of genotypic distance
         :param normalize: a boolean to normalize the distances
         Returns:
             np.ndarray: a 2D numpy array with the sum of all distances between one individual and all the others
@@ -153,9 +167,6 @@ class Population:
         get_distances = self.get_distances(normalize=False)
         diversity = np.mean(get_distances) / (self.size * len(self.individuals[0].swappable))
         return diversity
-
-        
-
 
 
     # ------------------------------------ Crossover ------------------------------------------------
@@ -343,7 +354,7 @@ class Population:
             self.roulette(diversify=diversify)
 
         if type == 'tournament':
-            self.tournament()
+            self.tournament(diversify=diversify)
 
         if type == 'rank':
             self.rank()
@@ -373,9 +384,11 @@ class Population:
         # Select the individuals using roulette wheel
         self.individuals = np.random.choice(self.individuals, size=self.size, p=probabilities_std, replace=True)
     
-    def tournament(self, tournament_size : int = 3):
+    def tournament(self, tournament_size : int = 3, diversify : str = None):
         """
         Function to apply tournament selection
+        :param tournament_size: an int representing the size of the tournament
+        :param diversify: a string representing the type of diversification to apply, choose between 'fitness-sharing' and 'restricted-mating'
         """
 
         # Define tournament
@@ -383,6 +396,12 @@ class Population:
 
         # Keep all fitnesses
         fitnesses = np.array([np.array([ind.fitness for ind in subarray]) for subarray in tournament])
+
+        if diversify == 'fitness-sharing':
+            # Get the distances between individuals
+            distances = self.get_distances(normalize=True)
+            # The larger the distance, the better the fitness
+            fitnesses = fitnesses * distances[:, None]
 
         # Find best in each of the tournaments
         min_indices = np.argmin(fitnesses, axis=1)

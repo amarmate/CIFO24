@@ -12,7 +12,7 @@ class Hill_climbing:
         self.history = {}
         self.params = {}
 
-    def run(self, max_iterations = 10000, num_neighbours = 1, swap_number = 1, plateau_threshold = 100, verbose = 0, stop_fitness = 0):
+    def run(self, max_iterations = 10000, num_neighbours = 1, swap_number = 1, plateau_threshold = 100, verbose = 0, stop_fitness = 0, smart = False):
         """Hill climbs a given search space.
         Args:
             individual (Individual): Individual object to hill climb.
@@ -22,6 +22,7 @@ class Hill_climbing:
             plateau_threshold (int, optional): Threshold to stop if stuck in a plateau. Defaults to 100.
             verbose (int, optional): Verbosity level. Defaults to 0.
             stop_fitness (int, optional): Fitness value to stop at. Defaults to 0.
+            smart (bool, optional): Whether to use smart swapping. Defaults to False.
         Returns:
             Individual: Local optima Individual found in the search.
         """
@@ -49,7 +50,8 @@ class Hill_climbing:
                 return position
 
             # generate solution from neighbours
-            neighbours = position.get_neighbours(num_neighbours, swap_number)
+
+            neighbours = position.get_neighbours(num_neighbours, swap_number, smart=smart)
             n_fit = [i.fitness for i in neighbours]
 
             best_n = neighbours[n_fit.index(min(n_fit))]
@@ -106,7 +108,7 @@ class Sim_annealing:
         self.history = {}
         self.params = {}
 
-    def run(self, L=20, c=10, alpha=0.95, threshold=0.05, verbose=0, num_neighbours=1, swap_number=1):
+    def run(self, L=20, c=10, alpha=0.95, threshold=0.05, verbose=0, num_neighbours=1, swap_number=1, smart=False):
         """Simulated annealing implementation.
 
         Args:
@@ -118,6 +120,7 @@ class Sim_annealing:
             verbose (int, optional): Verbosity level. Defaults to 0.
             num_neighbours (int, optional): Number of neighbours to generate. Defaults to 1.
             swap_number (int, optional): Number of swaps to make in the board. Defaults to 1.
+            smart (bool, optional): Whether to use smart swapping. Defaults to False.
         Returns:
             Individual: an Individual object - the best found by SA.
         """
@@ -138,7 +141,7 @@ class Sim_annealing:
             # 3.1 repeat L times
             for iteration in range(L):
                 # 3.1.1 get random neighbour
-                neighbour = choice(position.get_neighbours(num_neighbours, swap_number))
+                neighbour = choice(position.get_neighbours(num_neighbours, swap_number, smart=smart))
 
                 # 3.1.2 if neighbour fitness is better or equal, accept
                 if neighbour.fitness <= position.fitness:
