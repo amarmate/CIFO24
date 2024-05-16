@@ -4,6 +4,8 @@ from Objects.sudoku import Sudoku
 from copy import deepcopy
 from Operators.fitness import fitness as fitness_function
 import matplotlib.pyplot as plt
+from scipy.spatial import distance_matrix
+from scipy.spatial.distance import cdist
 
 class Population:
     """
@@ -134,12 +136,13 @@ class Population:
             np.ndarray: a 2D numpy array with the sum of all distances between one individual and all the others
         """
         individuals = np.array([ind.swappable for ind in self.individuals])
-        def get_distance(i):
-            diff = individuals[i] != individuals
-            diff[i, :] = False
-            return np.sum(np.sum(diff, axis=1))
+        # def get_distance(i):
+        #     diff = individuals[i] != individuals
+        #     diff[i, :] = False
+        #     return np.sum(np.sum(diff, axis=1))
         
-        distances = np.array([get_distance(i) for i in range(len(self))])  
+        
+        distances = np.sum(cdist(individuals, individuals, 'hamming'), axis=1) 
 
         if normalize:
             distances = (distances - np.min(distances)) / (np.max(distances) - np.min(distances))
@@ -371,9 +374,8 @@ class Population:
         elif diversify == 'fitness-sharing':
             # Get the distances between individuals
             distances = self.get_distances(normalize=True)
-            fitnesses = [1/(individual.fitness+0.000001) for individual in self.individuals]
             # The larger the distance, the better the fitness
-            fitnesses = [fitness * distances[i] for i, fitness in enumerate(fitnesses)]
+            fitnesses = [(1/(individual.fitness+0.000001)) * distances[i] for i, individual in enumerate(self.individuals)]
         elif diversify == 'restricted-mating':
             fitnesses = []
         
