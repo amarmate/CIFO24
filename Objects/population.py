@@ -136,16 +136,17 @@ class Population:
             np.ndarray: a 2D numpy array with the sum of all distances between one individual and all the others
         """
         individuals = np.array([ind.swappable for ind in self.individuals])
-        # def get_distance(i):
-        #     diff = individuals[i] != individuals
-        #     diff[i, :] = False
-        #     return np.sum(np.sum(diff, axis=1))
         
+        # distances = np.sum(cdist(individuals, individuals, 'hamming'), axis=1) 
+        def get_distance(i):
+            diff = individuals[i] != individuals
+            diff[i, :] = False
+            return np.sum(np.sum(diff, axis=1))
         
-        distances = np.sum(cdist(individuals, individuals, 'hamming'), axis=1) 
+        distances = np.array([get_distance(i) for i in range(len(self))]) 
 
         if normalize:
-            distances = (distances - np.min(distances)) / (np.max(distances) - np.min(distances))
+            distances = 0.5+ (distances - np.min(distances))*0.5 / (np.max(distances) - np.min(distances))
         return distances
         
 
@@ -190,6 +191,9 @@ class Population:
 
         elif type == 'uniform':
             self.uniform()
+        
+        elif type == 'cycle':
+            self.cycle()
 
     def single_point(self, prob : float = 0.5, keep_distribution : bool = False):
         """
@@ -346,6 +350,84 @@ class Population:
         """
         pass
 
+    def cycle(self, prob : float = 0.5,  keep_distribution : bool = False):
+        """
+        Function to apply cycle crossover
+        """
+
+        if prob == 0:
+            pass
+        else:
+            population_array = np.array([i.swappable for i in self.individuals])
+                
+            # Get the number of parents and the shape of each parent
+            num_parents = len(self)
+            rows, cols = population_array.shape
+
+            # Sample how many crossovers to do
+            num_crossovers = sum(np.random.choice([0,1], size = int(num_parents/2), replace=True, p=[1-prob, prob]))
+
+            # Select two random parents for each offspring without replacement
+            parent_indices = np.random.choice(num_parents, size=(num_crossovers,2), replace=False)
+
+            # Matrices with parents from both sides
+            parent1 = population_array[parent_indices[:, 0]]
+            parent2 = population_array[parent_indices[:, 1]]
+
+            offspring = []
+
+            for i in range(len(parent1)):
+                indicator = True
+                current_position = 0
+                available_indicies = list(np.arange(len(parent1[i])))
+                while indicator:
+                    available_indicies.remove(current_position)
+                    mask = np.zeros(len(parent1[i]))
+                    mask[available_indicies] = True
+                    possible_next_indicies = np.where(mask*parent1[i] == parent2[i][current_position])[0]
+                    if len(possible_next_indicies) == 0:
+                        indicator = False
+                    else:
+                        current_position = np.random.choice(possible_next_indicies)
+                all_indicies = list(np.arange(len(parent1[i])))
+                used_indicies = list(set(all_indicies) - set(available_indicies))
+                offspring1 = np.zeros(len(parent1[i]), dtype=int)
+                offspring2 = np.zeros(len(parent1[i]), dtype=int)
+
+                offspring1[available_indicies] = parent2[i][available_indicies]
+                offspring1[used_indicies] = parent1[i][used_indicies]
+                offspring2[available_indicies] = parent1[i][available_indicies]
+                offspring2[used_indicies] = parent2[i][used_indicies]
+                offspring.append(offspring1)
+                offspring.append(offspring2)
+            
+            offspring = np.array(offspring)
+
+            # Put parents that didn't get crossovered back into the population
+            if num_crossovers < num_parents:
+                left_ind = np.setdiff1d(np.arange(num_parents), parent_indices.flatten())
+                offspring = np.concatenate((offspring, population_array[left_ind]))
+
+
+            # Append random offsprings from parents until we reach population size
+            if offspring.shape[0] < num_parents:
+                while offspring.shape[0] < num_parents:
+                    offspring = np.append(offspring, 
+                                        np.expand_dims(population_array[np.random.choice(len(population_array))], axis=0), axis = 0)
+                    
+            if keep_distribution:
+                perfect_distribution = np.tile(self.individuals[0].distribution, len(offspring))
+                real_distribution = np.apply_along_axis(lambda row: np.bincount(row, minlength=10), axis=1, arr=offspring)
+                difference = perfect_distribution - real_distribution
+
+            
+            # Put the offsprings into the population
+            for i in range(len(self)):
+                swappable = offspring[i]
+                board = deepcopy(self.individuals[i].board)
+                np.putmask(board, self.individuals[i].swap_points, swappable)
+                self.individuals[i] = Sudoku(initial_board=self.individuals[i].initial_board, board=board)
+
     # ------------------------------------ Selection ------------------------------------------------
     def selection(self, type : str = 'roulette', diversify : str = None):
         """
@@ -469,8 +551,6 @@ class Population:
         plt.ylabel('Diversity')
         plt.legend()
         plt.show()
-    
-        
 
 
 # ------------------------- Main --------------------------------------------------
