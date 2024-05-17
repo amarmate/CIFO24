@@ -64,7 +64,7 @@ class Population:
         
         assert elite_size <= self.size, "The number of elite individuals has to be less than the population size"
         assert elite_size >= 0, "The number of elite individuals has to be greater than 0"
-        assert mutation not in ['change', 'change-smart'] and xo != 'special_xo', "The special crossover can only be applied with swap mutations"
+        assert mutation not in ['change', 'change-smart'] or xo != 'special_xo', "Special crossover cannot be applied when swap mutation is on"
         print("Warning! Random fill can only be applied to special crossover.") if random_fill and xo != 'special_xo' else None
 
         self.params = {'gens': gens, 'xo_prob': xo_prob, 'mut_prob': mut_prob, 'select_type': select_type, 'xo': xo, 'diversify': diversify, 'elite_size': elite_size, 'mutation': mutation, 'swap_number': swap_number, 'keep_distribution': keep_distribution}
