@@ -42,6 +42,8 @@ class Population:
                mutation : str ='change', 
                swap_number : int = 1, 
                keep_distribution : bool =False, 
+               random_fill : bool = False,
+               plateau_threshold : int = 100,
                verbose : int = 0):
         """
         Function to evolve the population
@@ -49,20 +51,26 @@ class Population:
         :param xo_prob: a float representing the probability of crossover
         :param mut_prob: a float representing the probability of mutation
         :param select_type: a string representing the type of selection to apply, choose between 'roulette', 'tournament', 'rank'
-        :param xo: a string representing the type of crossover to apply, choose between 'single_point', 'multi_point', 'pmxc', 'uniform'
+        :param xo: a string representing the type of crossover to apply, choose between 'single_point', 'multi_point', 'pmxc', 'uniform', 'cycle', 'special_xo'
         :param diversify: a string representing the type of diversification to apply, choose between 'fitness-sharing' and 'restricted-mating'
         :param elite_size: an int representing the number of elite individuals to keep
-        :param mutation: a string representing the type of mutation to apply
+        :param mutation: a string representing the type of mutation to apply, choose between 'change', 'swap', 'change-smart', 'swap-smart'
         :param swap_number: an int representing the number of swaps to make in the board
         :param keep_distribution: a boolean representing whether to keep the distribution of numbers in the board
+        :param random_fill: a boolean representing whether to fill the offspring randomly in special crossover
+        :param plateau_threshold: an int representing the number of generations to wait for a plateau before stopping the evolution
         :param verbose: an int representing the verbosity level of the evolution
         """
         
         assert elite_size <= self.size, "The number of elite individuals has to be less than the population size"
         assert elite_size >= 0, "The number of elite individuals has to be greater than 0"
+        assert mutation not in ['change', 'change-smart'] and xo != 'special_xo', "The special crossover can only be applied with swap mutations"
+        print("Warning! Random fill can only be applied to special crossover.") if random_fill and xo != 'special_xo' else None
 
         self.params = {'gens': gens, 'xo_prob': xo_prob, 'mut_prob': mut_prob, 'select_type': select_type, 'xo': xo, 'diversify': diversify, 'elite_size': elite_size, 'mutation': mutation, 'swap_number': swap_number, 'keep_distribution': keep_distribution}
 
+        threshold = 0
+        best_fitness = 1000
         for i in range(gens):
             if elite_size > 0:
                 best_individuals = self.get_best_individuals(elite_size)
@@ -80,14 +88,24 @@ class Population:
                     self[j] = best_individuals[j]
 
             best_individual_fitness = min([ind.fitness for ind in self.individuals])
-            print(f"Best individual of gen #{i + 1}: {best_individual_fitness}") if verbose >= 1 else None
 
+            if best_individual_fitness == best_fitness:
+                threshold += 1
+            else:
+                threshold = 0
+                best_fitness = best_individual_fitness
+
+            print(f"Best individual of gen #{i + 1}: {best_individual_fitness}") if verbose >= 1 else None
             self.history[self.gen] = best_individual_fitness, self.phenotype_diversity(type='entropy'), self.genotype_diversity()
             self.gen += 1
 
             if self.get_best_individuals(1)[0].fitness == 0:
                 print(f"Solution found in generation {i + 1}!")
                 self.get_best_individuals(1)[0].display()
+                break
+
+            if threshold == plateau_threshold:
+                print(f"Plateau reached at generation {i + 1}!")
                 break
 
     # -------------------------------------------------------------------------------------------------------
@@ -146,7 +164,8 @@ class Population:
         distances = np.array([get_distance(i) for i in range(len(self))]) 
 
         if normalize:
-            distances = 0.5+ (distances - np.min(distances))*0.5 / (np.max(distances) - np.min(distances))
+            # distances = 0.5+ (distances - np.min(distances))*0.5 / (np.max(distances) - np.min(distances))
+            distances = (distances - np.min(distances)) / (np.max(distances) - np.min(distances))
         return distances
         
 
@@ -198,7 +217,7 @@ class Population:
             self.cycle()
 
         elif type == 'special_xo':
-            self.special_xo(prob, random_fill=True)
+            self.special_xo(prob, random_fill=random_fill)
 
 
 
@@ -362,6 +381,7 @@ class Population:
         Function to apply a special crossover
         """
         def special(individual1, individual2, prob : float = 0.5, random_fill : bool = False):
+            assert np.array_equal(np.bincount(individual1.swappable), np.bincount(individual2.swappable)), "The individuals have to have the same distribution of numbers"
             if np.random.rand() > prob:
                 return individual1, individual2
             
@@ -377,11 +397,12 @@ class Population:
             offspring_1, offspring_2 = np.zeros(len(parent1)), np.zeros(len(parent1))
             
             if random_fill:
-                first_part_2 = np.random.choice(np.setdiff1d(parent2, first_part_1), len(first_part_1), replace=False)
-                last_part_1 = np.random.choice(np.setdiff1d(parent1, last_part_2), len(last_part_2), replace=False)
-                offspring_1 = np.concatenate((first_part_1, last_part_1))
-                offspring_2 = np.concatenate((first_part_2, last_part_2))
+                first_part_2 = first_part_1.copy()
+                last_part_1 = last_part_2.copy()
+                np.random.shuffle(first_part_2)
+                np.random.shuffle(last_part_1)
 
+            # If the first part of offspring 1 is smaller, we want to find the order of those numbers for the first part 2
             elif len(first_part_1) <= len(last_part_2):
                 # We know that in the first_part_2 we are missing [4,4,2], so we need to find them in parent2
                 missing_numbers = np.bincount(first_part_1, minlength=10)
@@ -394,9 +415,7 @@ class Population:
                         missing_numbers[number] -= 1
                 first_part_2 = parent2[indices]
                 last_part_1 = parent2[~np.isin(np.arange(len(parent2)), indices)]
-                offspring_1 = np.concatenate((first_part_1, last_part_1))
-                offspring_2 = np.concatenate((first_part_2, last_part_2))
-            
+
             else:
                 # We know that in the first_part_2 we are missing [4,4,2], so we need to find them in parent2
                 missing_numbers = np.bincount(last_part_2, minlength=10)
@@ -409,20 +428,18 @@ class Population:
                         missing_numbers[number] -= 1
                 first_part_2 = parent2[~np.isin(np.arange(len(parent2)), indices)]
                 last_part_1 = parent2[indices]
-                offspring_1 = np.concatenate((first_part_1, last_part_1))
-                offspring_2 = np.concatenate((first_part_2, last_part_2))
 
-                
             # Get the individuals
             offspring_board_1, offspring_board_2 = deepcopy(individual1.initial_board), deepcopy(individual2.initial_board)
-            np.putmask(offspring_board_1, individual1.swap_points, offspring_1)
-            np.putmask(offspring_board_2, individual2.swap_points, offspring_2)
+            offspring_board_1[individual1.swap_points] = np.concatenate((first_part_1, last_part_1))
+            offspring_board_2[individual2.swap_points] = np.concatenate((first_part_2, last_part_2))
             offspring_1 = Sudoku(initial_board=individual1.initial_board, board=offspring_board_1)
             offspring_2 = Sudoku(initial_board=individual2.initial_board, board=offspring_board_2)
             return offspring_1, offspring_2
 
         parents = np.random.choice(self.individuals, size=(int(self.size/2), 2), replace=False)
         offspring = [special(parents[i, 0], parents[i, 1], prob, random_fill) for i in range(int(self.size/2))]
+        offspring = np.array(offspring).flatten()
         self.individuals = offspring
 
 
