@@ -71,6 +71,7 @@ class Population:
 
         threshold = 0
         best_fitness = 1000
+        init_mut_prob = mut_prob
         for i in range(gens):
             if elite_size > 0:
                 best_individuals = self.get_best_individuals(elite_size)
@@ -94,6 +95,7 @@ class Population:
             else:
                 threshold = 0
                 best_fitness = best_individual_fitness
+                mut_prob = init_mut_prob
 
             print(f"Best individual of gen #{i + 1}: {best_individual_fitness}") if verbose >= 1 else None
             self.history[self.gen] = best_individual_fitness, self.phenotype_diversity(type='entropy'), self.genotype_diversity()
@@ -105,8 +107,10 @@ class Population:
                 break
 
             if threshold == plateau_threshold:
-                print(f"Plateau reached at generation {i + 1}!")
-                break
+                mut_prob = mut_prob + 0.2
+                print(f"Plateau reached at generation {i + 1}! New mut_prob: {mut_prob}.") if verbose == True else None
+                threshold = 0
+                # break
 
     # -------------------------------------------------------------------------------------------------------
     def keep_distribution(self):
@@ -165,7 +169,7 @@ class Population:
 
         if normalize:
             # distances = 0.5+ (distances - np.min(distances))*0.5 / (np.max(distances) - np.min(distances))
-            distances = (distances - np.min(distances)) / (np.max(distances) - np.min(distances))
+            distances = (distances - np.min(distances)) / (np.max(distances) - np.min(distances)+0.0000001) 
         return distances
         
 
@@ -488,15 +492,16 @@ class Population:
                 offspring1 = np.zeros(len(parent1[i]), dtype=int)
                 offspring2 = np.zeros(len(parent1[i]), dtype=int)
 
+
                 offspring1[available_indicies] = parent2[i][available_indicies]
                 offspring1[used_indicies] = parent1[i][used_indicies]
                 offspring2[available_indicies] = parent1[i][available_indicies]
                 offspring2[used_indicies] = parent2[i][used_indicies]
                 offspring.append(offspring1)
                 offspring.append(offspring2)
+
             
             offspring = np.array(offspring)
-
             # Put parents that didn't get crossovered back into the population
             if num_crossovers < num_parents:
                 left_ind = np.setdiff1d(np.arange(num_parents), parent_indices.flatten())
@@ -519,7 +524,8 @@ class Population:
             for i in range(len(self)):
                 swappable = offspring[i]
                 board = deepcopy(self.individuals[i].board)
-                np.putmask(board, self.individuals[i].swap_points, swappable)
+                board[self.individuals[i].swap_points] = swappable
+                # np.putmask(board, self.individuals[i].swap_points, swappable)
                 self.individuals[i] = Sudoku(initial_board=self.individuals[i].initial_board, board=board)
 
     # ------------------------------------ Selection ------------------------------------------------
@@ -551,13 +557,18 @@ class Population:
             # Get the distances between individuals
             distances = self.get_distances(normalize=True)
             # The larger the distance, the better the fitness
-            fitnesses = [(1/(individual.fitness+0.000001)) * distances[i] for i, individual in enumerate(self.individuals)]
+            fitnesses = [(1/(individual.fitness+0.000001)) * (distances[i]+0.0000001) for i, individual in enumerate(self.individuals)]
         elif diversify == 'restricted-mating':
             fitnesses = []
         
         total_fitness = sum(fitnesses)
         probabilities = [fitness / total_fitness for fitness in fitnesses]
         probabilities_std = [prob / sum(probabilities) for prob in probabilities]
+        if max(np.isnan(probabilities_std)) == 1:
+            probabilities_std = np.nan_to_num(probabilities_std)
+            print(probabilities_std)
+            print(distances)
+            print(fitnesses)
         
         # Select the individuals using roulette wheel
         self.individuals = np.random.choice(self.individuals, size=self.size, p=probabilities_std, replace=True)
