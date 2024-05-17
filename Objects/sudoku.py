@@ -111,8 +111,16 @@ class Sudoku:
         np.random.shuffle(fill_numbers)
 
         # Fill in the board
-        np.putmask(flat_board, flat_board == 0, fill_numbers)
+        # np.putmask(flat_board, flat_board == 0, fill_numbers)
+        flat_board[np.where(flat_board == 0)] = fill_numbers
         self.board = flat_board.reshape(self.N, self.N)
+
+
+    def fill_board_logic(self):
+        """
+        Method to fill the board using logic, i.e. by solving the board with logic 
+        """
+        pass
 
 
 
@@ -206,15 +214,17 @@ class Sudoku:
         Function to print the board in a readable format
         """
         to_print = ""
+        sq_size = int(np.sqrt(self.N))
         # Row iteration
         for row in range(self.N):
-            if row % 3 == 0 and row != 0 and row != self.N - 1:
-                to_print += "\n----------|-----------|----------\n"
-            else:
-                to_print += "\n"
+            if row % np.sqrt(self.N) == 0 and row != 0 and row != self.N - 1:
+                to_print += "\n" + (sq_size + 5)*'-' + ((sq_size - 2) * ('|' + (self.N + 1)*'-')) + '|' + (sq_size + 5)*'-' + "\n"
+            else:                
+                to_print += "\n"              
+
 
             for column in range(self.N):
-                if column % 3 == 0 and column != 0 and column != self.N - 1:
+                if column % np.sqrt(self.N) == 0 and column != 0 and column != self.N - 1:
                     to_print += " | "
                 to_print += " " + str(self.board[row, column]) + " "
         print(to_print)
