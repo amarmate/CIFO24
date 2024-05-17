@@ -174,11 +174,13 @@ class Population:
 
 
     # ------------------------------------ Crossover ------------------------------------------------
-    def crossover(self, type : str = 'single_point', prob : float = 0.5, elitism : bool = False):
+    def crossover(self, type : str = 'single_point', prob : float = 0.5, random_fill : bool = False):
         """
         Function to crossover the individuals in the population
         :param type: a string representing the type of crossover to apply
         """
+        if type != 'special_xo' and random_fill:
+            print("Warning! Random fill can only be applied to special crossover.")
 
         if type == 'single_point':
             self.single_point(prob)
@@ -194,6 +196,11 @@ class Population:
         
         elif type == 'cycle':
             self.cycle()
+
+        elif type == 'special_xo':
+            self.special_xo(prob, random_fill=True)
+
+
 
     def single_point(self, prob : float = 0.5, keep_distribution : bool = False):
         """
@@ -350,6 +357,76 @@ class Population:
         """
         pass
 
+    def special_xo(self, prob : float = 0.5, random_fill : bool = False):
+        """
+        Function to apply a special crossover
+        """
+        def special(individual1, individual2, prob : float = 0.5, random_fill : bool = False):
+            if np.random.rand() > prob:
+                return individual1, individual2
+            
+            parent1 = individual1.swappable       # E.g.: [4,4,2,6,1,9,5,5,3]
+            parent2 = individual2.swappable       # E.g.: [3,4,5,9,1,6,4,2,5]
+
+            split_index = np.random.randint(1, len(parent1)-1)
+            first_part_1 = parent1[:split_index]  # E.g.: [4,4,2]
+            last_part_2 = parent1[split_index:]   # E.g.: [6,1,9,5,5,3]
+
+            # Now we need to get the first_part_2 and last_part_1 from parent2
+            first_part_2, last_part_1 = [], []
+            offspring_1, offspring_2 = np.zeros(len(parent1)), np.zeros(len(parent1))
+            
+            if random_fill:
+                first_part_2 = np.random.choice(np.setdiff1d(parent2, first_part_1), len(first_part_1), replace=False)
+                last_part_1 = np.random.choice(np.setdiff1d(parent1, last_part_2), len(last_part_2), replace=False)
+                offspring_1 = np.concatenate((first_part_1, last_part_1))
+                offspring_2 = np.concatenate((first_part_2, last_part_2))
+
+            elif len(first_part_1) <= len(last_part_2):
+                # We know that in the first_part_2 we are missing [4,4,2], so we need to find them in parent2
+                missing_numbers = np.bincount(first_part_1, minlength=10)
+                indices = []
+                for i in range(len(parent2)):
+                    number = parent2[i]
+                    if missing_numbers[number] > 0:
+                        # Saving the indices of the numbers for the first_part_2 
+                        indices.append(i)
+                        missing_numbers[number] -= 1
+                first_part_2 = parent2[indices]
+                last_part_1 = parent2[~np.isin(np.arange(len(parent2)), indices)]
+                offspring_1 = np.concatenate((first_part_1, last_part_1))
+                offspring_2 = np.concatenate((first_part_2, last_part_2))
+            
+            else:
+                # We know that in the first_part_2 we are missing [4,4,2], so we need to find them in parent2
+                missing_numbers = np.bincount(last_part_2, minlength=10)
+                indices = []
+                for i in range(len(parent2)):
+                    number = parent2[i]
+                    if missing_numbers[number] > 0:
+                        # Saving the indices of the numbers for the first_part_2 
+                        indices.append(i)
+                        missing_numbers[number] -= 1
+                first_part_2 = parent2[~np.isin(np.arange(len(parent2)), indices)]
+                last_part_1 = parent2[indices]
+                offspring_1 = np.concatenate((first_part_1, last_part_1))
+                offspring_2 = np.concatenate((first_part_2, last_part_2))
+
+                
+            # Get the individuals
+            offspring_board_1, offspring_board_2 = deepcopy(individual1.initial_board), deepcopy(individual2.initial_board)
+            np.putmask(offspring_board_1, individual1.swap_points, offspring_1)
+            np.putmask(offspring_board_2, individual2.swap_points, offspring_2)
+            offspring_1 = Sudoku(initial_board=individual1.initial_board, board=offspring_board_1)
+            offspring_2 = Sudoku(initial_board=individual2.initial_board, board=offspring_board_2)
+            return offspring_1, offspring_2
+
+        parents = np.random.choice(self.individuals, size=(int(self.size/2), 2), replace=False)
+        offspring = [special(parents[i, 0], parents[i, 1], prob, random_fill) for i in range(int(self.size/2))]
+        self.individuals = offspring
+
+
+
     def cycle(self, prob : float = 0.5,  keep_distribution : bool = False):
         """
         Function to apply cycle crossover
@@ -468,6 +545,7 @@ class Population:
         # Select the individuals using roulette wheel
         self.individuals = np.random.choice(self.individuals, size=self.size, p=probabilities_std, replace=True)
     
+
     def tournament(self, tournament_size : int = 3, diversify : str = None):
         """
         Function to apply tournament selection
