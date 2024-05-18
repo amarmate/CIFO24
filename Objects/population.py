@@ -11,13 +11,14 @@ class Population:
     """
     A class to represent a population of sudoku puzzles
     """
-    def __init__(self, size : int = 100, initial_board : np.ndarray = None, sudoku_arguments = {}):
+    def __init__(self, size : int = 100, initial_board : np.ndarray = None, 
+                 sudoku_arguments = {}):
         """
         Constructor for the population class
         :param size: an int representing the size of the population
         :param initial_board: an NxN numpy array representing the initial state of the board, where N has to be a perfect square. 0s represent empty cells
         :param sudoku_arguments: a dictionary with the arguments to pass to the sudoku class 
-            available: fill_board, size, difficulty, fitness_function, hill_climbing_args, diff_function
+            available: fill_board, size, mode_generate, difficulty, diff_function, fitness_function, hill_climbing_args
         """
         self.size = size
         self.individuals = []
@@ -28,7 +29,7 @@ class Population:
         self.gen = 0
 
         if initial_board is None:
-            first_individual = Sudoku()
+            first_individual = Sudoku(**sudoku_arguments)
             initial_board = first_individual.initial_board
 
         # appending the population with individuals
@@ -657,30 +658,3 @@ class Population:
         plt.ylabel('Diversity')
         plt.legend()
         plt.show()
-
-
-# ------------------------- Main --------------------------------------------------
-if __name__ == '__main__':
-    test_board = np.array([[9, 4, 7, 3, 2, 6, 5, 8, 1],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [4, 7, 3, 5, 9, 2, 1, 6, 8],
-        [1, 2, 9, 8, 6, 4, 7, 3, 5],
-        [5, 6, 8, 7, 1, 3, 4, 9, 2],
-        [7, 9, 2, 4, 5, 8, 3, 1, 6],
-        [6, 1, 5, 2, 3, 9, 8, 7, 4],
-        [3, 8, 4, 6, 7, 1, 2, 5, 9]])
-
-    population = Population(
-    size=10,
-    initial_board=test_board,
-    )
-    population.evolve(gens = 10000,
-                    xo_prob = 0.9, 
-                    mut_prob=0.25, 
-                    select_type='roulette', 
-                    xo = 'single_point', 
-                    mutate = True, #should be smth else
-                    elitism = True,
-                    keep_distribution=True)
-

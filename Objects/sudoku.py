@@ -7,18 +7,21 @@ from Operators.conflicts import get_swappable_smart, get_infrequent_numbers
 from copy import deepcopy
 
 class Sudoku:
-    def __init__(self, initial_board : np.ndarray = None, board : np.ndarray = None, fill_board : str = 'random', size : int = 9, difficulty : int = 50, fitness_function = fitness,
-                 hill_climbing_args = {'max_iterations':100000, 'plateau_threshold':10000, 'num_neighbours': 10, 'smart': False}, diff_function = difficulty_function):
+    def __init__(self, initial_board : np.ndarray = None, board : np.ndarray = None, fill_board : str = 'random', size : int = 9, 
+                 mode_generate : str = 'random', difficulty : int = 50, diff_function : callable = difficulty_function,
+                 fitness_function = fitness,
+                 hill_climbing_args = {'max_iterations':100000, 'plateau_threshold':10000, 'num_neighbours': 10, 'smart': False}):
         """
         Constructor for the sudoku class
         :param initial_board: an NxN numpy array representing the initial state of the board, where N has to be a perfect square. 0s represent empty cells
         :param board: an NxN numpy array representing the current state of the board. If None, the board will be filled randomly
         :param fill_board: a string representing how to fill the board. Can be 'random', 'logic-random' and None
         :param size: an int representing the size of the board
+        :param mode_generate: a string representing how to generate the board. Can be 'random' or 'smart'
         :param difficulty: an int representing the number of numbers to remove, from 0 to 100, where 0 is the easiest and 100 is the hardest
+        :param diff_function: a function to calculate the difficulty of the board
         :param fitness_function: a function to calculate the fitness of the individual
         :param hill_climbing_args: a dictionary with the arguments to pass to the hill climbing algorithm : {'max_iterations': 1000, 'num_neighbours': 1, 'swap_number': 1, 'plateau_threshold': 100, 'verbose': 0}
-        :param diff_function: a function to calculate the difficulty of the board
         """
         
         # The initial board is the board that cannot be changed
@@ -26,7 +29,7 @@ class Sudoku:
             assert np.sqrt(size) % 1 == 0, "The dimension has to be a perfect square"
             print('Warning: Board given, but no initial board given. Generating a new board, and overwriting the given board') if board is not None else None
             self.N = size
-            self.generate_board(diff_function, size, difficulty, hill_climbing_args)
+            self.generate_board(mode_generate, diff_function, size, difficulty, hill_climbing_args)
         else:
             assert initial_board.shape[0] == initial_board.shape[1], "The board has to be a square"
             assert np.sqrt(initial_board.shape[0]) % 1 == 0, "The dimension has to be a perfect square"
@@ -51,7 +54,7 @@ class Sudoku:
         self.distribution = np.bincount(self.swappable, minlength=self.N + 1)
 
 
-    def generate_board(self, diff_function, size, difficulty, hill_climbing_args):
+    def generate_board(self, mode_generate : str = 'random', diff_function : callable = None, size : int = 9, difficulty : int = 50, hill_climbing_args : dict = {}):
         """
         Function to generate a new initial
         :param size: an int representing the size of the board
@@ -66,27 +69,43 @@ class Sudoku:
         assert filled_sudoku.fitness == 0, "The board could not be solved"
 
         # Remove numbers from the board
-        # filled_sudoku.remove_numbers(diff_function, difficulty)
+        filled_sudoku.remove_numbers(mode=mode_generate, diff_function=diff_function, difficulty=difficulty)
         
         self.initial_board = filled_sudoku.board
 
 
-    def remove_numbers(self, diff_function, difficulty : int = 50):
+    def remove_numbers(self, mode : str = 'random', difficulty : int = 50 , diff_function : callable = None):
         """
         Recursive function to remove numbers from the board
+        :param mode: a string representing how to remove the numbers. Can be 'random' or 'smart'. In case of 'smart' we need to input the difficulty function
         :param difficulty: an int representing the number of numbers to remove, from 0 to 100, where 0 is the easiest and 100 is the hardest
         :param difficulty_function: a function to calculate the difficulty of the board
         """
-        if diff_function(self.initial_board) >= difficulty:
-            print("The board is already at the desired difficulty")
-            return
-        
+        assert mode in ['random', 'smart'], "The mode has to be 'random' or 'smart'"
+        assert diff_function is not None or mode == 'random', "The difficulty function has to be given if the mode is 'smart'"
+        assert 0 <= difficulty <= 100, "The difficulty has to be between 0 and 100"
+
         # Remove a number from the board 
-        
-        
+        if mode == 'random':
+            zeros = np.sum(self.board == 0)
+            current_difficulty = zeros / (self.N ** 2) * 100
+            if current_difficulty >= difficulty:
+                return
+            
+            # Get a random position to remove a number from 
+            non_empty_positions = np.where(self.board != 0)
+            random_position = np.random.choice(np.arange(len(non_empty_positions[0])))
+            position = (non_empty_positions[0][random_position], non_empty_positions[1][random_position])
+            self.board[position] = 0
+
+        elif mode == 'smart':
+            if diff_function(self.initial_board) >= difficulty:
+                return
+            
+            pass
 
         # Recursively call the function to remove numbers
-        self.remove_numbers(diff_function, difficulty)
+        self.remove_numbers(mode=mode, difficulty=difficulty, diff_function=diff_function)
 
 
     def fill_board(self, mode : str = 'random'):
