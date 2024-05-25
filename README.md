@@ -7,3 +7,5 @@
 - representation - list with only changeable elements as a long list, the one that we will use for crossovers and mutations
 
 So every step of population evolution we will update representation and board afterwards
+
+Report: https://www.overleaf.com/read/jrpvvdnxmjpz#b7ee7f
