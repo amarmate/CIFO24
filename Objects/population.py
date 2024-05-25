@@ -44,6 +44,7 @@ class Population:
                swap_number : int = 1, 
                keep_distribution : bool =False, 
                random_fill : bool = False,
+               direction : str = 'rows',
                plateau_threshold : int = 100,
                verbose : int = 0):
         """
@@ -68,7 +69,16 @@ class Population:
         assert mutation not in ['change', 'change-smart'] or xo != 'special_xo', "Special crossover cannot be applied when swap mutation is on"
         print("Warning! Random fill can only be applied to special crossover.") if random_fill and xo != 'special_xo' else None
 
-        self.params = {'gens': gens, 'xo_prob': xo_prob, 'mut_prob': mut_prob, 'select_type': select_type, 'xo': xo, 'diversify': diversify, 'elite_size': elite_size, 'mutation': mutation, 'swap_number': swap_number, 'keep_distribution': keep_distribution}
+        self.params = {'gens': gens, 
+                       'xo_prob': xo_prob, 
+                       'mut_prob': mut_prob, 
+                       'select_type': select_type, 
+                       'xo': xo, 
+                       'diversify': diversify, 
+                       'elite_size': elite_size, 
+                       'mutation': mutation, 
+                       'swap_number': swap_number, 
+                       'keep_distribution': keep_distribution}
 
         threshold = 0
         best_fitness = 1000
@@ -78,7 +88,7 @@ class Population:
                 best_individuals = self.get_best_individuals(elite_size)
 
             self.selection(select_type, diversify)
-            self.crossover(type=xo, prob=xo_prob)
+            self.crossover(type=xo, prob=xo_prob, direction = direction)
             for j in range(len(self.individuals)):
                 self[j] = self[j].mutate(mut_prob, swap_number, mutation=mutation)
 
@@ -109,6 +119,7 @@ class Population:
 
             if threshold == plateau_threshold:
                 mut_prob = mut_prob + 0.2
+                mut_prob = min(mut_prob, 1)
                 print(f"Plateau reached at generation {i + 1}! New mut_prob: {mut_prob}.") if verbose == True else None
                 threshold = 0
                 # break
@@ -198,7 +209,7 @@ class Population:
 
 
     # ------------------------------------ Crossover ------------------------------------------------
-    def crossover(self, type : str = 'single_point', prob : float = 0.5, random_fill : bool = False):
+    def crossover(self, type : str = 'single_point', prob : float = 0.5, random_fill : bool = False, direction = 'rows'):
         """
         Function to crossover the individuals in the population
         :param type: a string representing the type of crossover to apply
@@ -223,6 +234,9 @@ class Population:
 
         elif type == 'special_xo':
             self.special_xo(prob, random_fill=random_fill)
+        
+        elif type == 'single_point_tabular':
+            self.single_point_tabular(prob, direction=direction)
 
 
 
@@ -528,6 +542,101 @@ class Population:
                 board[self.individuals[i].swap_points] = swappable
                 # np.putmask(board, self.individuals[i].swap_points, swappable)
                 self.individuals[i] = Sudoku(initial_board=self.individuals[i].initial_board, board=board)
+
+    def single_point_tabular(self, prob : float = 0.5, direction : str = 'rows', keep_distribution : bool = False):
+        """
+        Function to apply single_point_tabular crossover
+        """
+        assert direction in ['rows', 'columns', 'random'], 'Direction must be either rows, columns or random'
+
+        if prob == 0:
+            pass
+        else:
+
+            population_array = np.array([i.board for i in self.individuals])
+            
+            # Get the number of parents and the shape of each parent
+            num_parents = len(self)
+
+            # Sample how many crossovers to do
+            num_crossovers = sum(np.random.choice([0,1], size = int(num_parents/2), replace=True, p=[1-prob, prob]))
+
+            # Select two random parents for each offspring without replacement
+            parent_indices = np.random.choice(num_parents, size=(num_crossovers,2), replace=False)
+
+            offspring = []
+            if direction == 'rows':
+                for i in range(len(parent_indices)):
+                    # Choose point to cut board vertically
+                    crossover_point = np.random.randint(self.individuals[0].N)
+                    ind = parent_indices[i]
+                    offspring1 = np.concatenate((self.individuals[ind[0]].board[:, :crossover_point], 
+                                            self.individuals[ind[1]].board[:, crossover_point:]), axis = 1)
+                    offspring2 = np.concatenate((self.individuals[ind[1]].board[:, :crossover_point], 
+                                            self.individuals[ind[0]].board[:, crossover_point:]), axis = 1)
+                    offspring.append(offspring1)
+                    offspring.append(offspring2)
+
+            if direction == 'columns':
+                for i in range(len(parent_indices)):
+                    # Choose point to cut board horizontally
+                    crossover_point = np.random.randint(self.individuals[0].N)
+                    ind = parent_indices[i]
+                    offspring1 = np.concatenate((self.individuals[ind[0]].board[:crossover_point, :], 
+                                            self.individuals[ind[1]].board[crossover_point:, :]), axis = 0)
+                    offspring2 = np.concatenate((self.individuals[ind[1]].board[:crossover_point, :], 
+                                            self.individuals[ind[0]].board[crossover_point:, :]), axis = 0)
+                    offspring.append(offspring1)
+                    offspring.append(offspring2)
+                    
+            if direction == 'random':
+                for i in range(len(parent_indices)):
+                    # Choose direction to cut on every iteration
+                    type = np.random.choice(['rows', 'columns'])
+
+                    if type == 'rows':
+                        crossover_point = np.random.randint(self.individuals[0].N)
+                        ind = parent_indices[i]
+                        offspring1 = np.concatenate((self.individuals[ind[0]].board[:, :crossover_point], 
+                                                self.individuals[ind[1]].board[:, crossover_point:]), axis = 1)
+                        offspring2 = np.concatenate((self.individuals[ind[1]].board[:, :crossover_point], 
+                                                self.individuals[ind[0]].board[:, crossover_point:]), axis = 1)
+                        offspring.append(offspring1)
+                        offspring.append(offspring2)
+
+                    if type == 'columns':
+                        crossover_point = np.random.randint(self.individuals[0].N)
+                        ind = parent_indices[i]
+                        offspring1 = np.concatenate((self.individuals[ind[0]].board[:crossover_point, :], 
+                                                self.individuals[ind[1]].board[crossover_point:, :]), axis = 0)
+                        offspring2 = np.concatenate((self.individuals[ind[1]].board[:crossover_point, :], 
+                                                self.individuals[ind[0]].board[crossover_point:, :]), axis = 0)
+                        offspring.append(offspring1)
+                        offspring.append(offspring2)
+
+            offspring = np.array(offspring)
+            # Put parents that didn't get crossovered back into the population
+            if num_crossovers < num_parents:
+                left_ind = np.setdiff1d(np.arange(num_parents), parent_indices.flatten())
+                offspring = np.concatenate((offspring, population_array[left_ind]))
+
+
+            # Append random offsprings from parents until we reach population size
+            if offspring.shape[0] < num_parents:
+                while offspring.shape[0] < num_parents:
+                    offspring = np.append(offspring, 
+                                        np.expand_dims(population_array[np.random.choice(len(population_array))], axis=0), axis = 0)
+                    
+            if keep_distribution:
+                perfect_distribution = np.tile(self.individuals[0].distribution, len(offspring))
+                real_distribution = np.apply_along_axis(lambda row: np.bincount(row, minlength=10), axis=1, arr=offspring)
+                difference = perfect_distribution - real_distribution
+
+            
+            # Put the offsprings into the population
+            for i in range(len(self)):
+                self.individuals[i] = Sudoku(initial_board=self.individuals[i].initial_board, board=offspring[i])
+
 
     # ------------------------------------ Selection ------------------------------------------------
     def selection(self, type : str = 'roulette', diversify : str = None):
