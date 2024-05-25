@@ -64,6 +64,8 @@ class Population:
         :param random_fill: a boolean representing whether to fill the offspring randomly in special crossover
         :param plateau_threshold: an int representing the number of generations to wait for a plateau before stopping the evolution
         :param verbose: an int representing the verbosity level of the evolution
+        :param normalize_distances: a boolean representing whether to normalize the distances between individuals
+        :param invert_distances: a boolean representing whether to invert the distances between individuals for fitness-sharing
         """
         
         assert elite_size <= self.size, "The number of elite individuals has to be less than the population size"
@@ -129,11 +131,9 @@ class Population:
     # -------------------------------------------------------------------------------------------------------
     def keep_distribution(self):
         """
-        Function to keep the correct distribution of numbers inside each individual 
+        Function to keep the correct distribution of numbers inside each individual if it was changed by the mutation or xo
         """
 
-        # TODO check why it doesnt really preserve distribution in some cases
-        # print("Perfect distribution", self[0].distribution)
 
         perfect_distribution = np.tile(self[0].distribution, (len(self), 1))
         real_distribution = np.apply_along_axis(lambda row: np.bincount(row, minlength=self[0].N + 1), axis=1, arr=[self[i].swappable for i in range(len(self))])
@@ -163,7 +163,6 @@ class Population:
             else:
                 pass
 
-    # TODO too harsh normalization 
     def get_distances(self, normalize : bool = True, invert : bool = False):
         """
         Function to get the distance matrix between individuals, in terms of genotypic distance
@@ -173,7 +172,6 @@ class Population:
         """
         individuals = np.array([ind.swappable for ind in self.individuals])
         
-        # distances = np.sum(cdist(individuals, individuals, 'hamming'), axis=1) 
         def get_distance(i, invert=invert):
             if invert:
                 diff = individuals[i] != individuals
@@ -190,8 +188,8 @@ class Population:
         distances = np.array([get_distance(i) for i in range(len(self))]) 
 
         if normalize:
-            # distances = 0.5+ (distances - np.min(distances))*0.5 / (np.max(distances) - np.min(distances))
             distances = (distances - np.min(distances)) / (np.max(distances) - np.min(distances)+0.0000001) 
+
         return distances
         
 
@@ -232,15 +230,9 @@ class Population:
 
         if type == 'multi_point':
             return self.multi_point(prob)
-
-        elif type == 'pmxc':
-            self.pmx_crossover()
-
-        elif type == 'uniform':
-            self.uniform()
         
         elif type == 'cycle':
-            self.cycle()
+            self.cycle(prob)
 
         elif type == 'special_xo':
             self.special_xo(prob, random_fill=random_fill)
@@ -392,18 +384,6 @@ class Population:
                 board = deepcopy(self.individuals[i].board)
                 np.putmask(board, self.individuals[i].swap_points, swappable)
                 self.individuals[i] = Sudoku(initial_board=self.individuals[i].initial_board, board=board)
-    
-    
-    def pmx_crossover(self):
-        """
-        Function to apply partially mapped crossover
-        """
-
-    def uniform(self):
-        """
-        Function to apply uniform crossover
-        """
-        pass
 
     def special_xo(self, prob : float = 0.5, random_fill : bool = False):
         """
@@ -476,6 +456,14 @@ class Population:
     def cycle(self, prob : float = 0.5,  keep_distribution : bool = False):
         """
         Function to apply cycle crossover
+
+        Example step:
+
+        1. Getting possible next positions for the cycle based on the parent2 value on the current position in parent1
+        2. For example, we have number 7 there for next step and there are 3 sevens in parent1 on positions 3,4,5
+        3. We pick one position randomly, foe example, position 4
+        4. Remove position 4 from list of possible positions
+        4. Then go to the position 4 and repeat such moves until we find a number that is not in parent1
         """
 
         if prob == 0:
@@ -500,17 +488,19 @@ class Population:
             offspring = []
 
             for i in range(len(parent1)):
-                indicator = True
+                indicator = True # To know if we need to continue the cycle
                 current_position = 0
-                available_indicies = list(np.arange(len(parent1[i])))
+                available_indicies = list(np.arange(len(parent1[i]))) # List with the available indicies during the cycle loop
                 while indicator:
-                    available_indicies.remove(current_position)
+                    available_indicies.remove(current_position) # Remove every visited position
                     mask = np.zeros(len(parent1[i]))
                     mask[available_indicies] = True
-                    possible_next_indicies = np.where(mask*parent1[i] == parent2[i][current_position])[0]
+                    # Getting possible next positions for the cycle based on the parent2 value on the current position
+                    possible_next_indicies = np.where(mask*parent1[i] == parent2[i][current_position])[0] 
                     if len(possible_next_indicies) == 0:
                         indicator = False
                     else:
+                        # If we found a number that is not in parent1, we need to continue the cycle and go to that position
                         current_position = np.random.choice(possible_next_indicies)
                 all_indicies = list(np.arange(len(parent1[i])))
                 used_indicies = list(set(all_indicies) - set(available_indicies))
