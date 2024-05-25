@@ -1,6 +1,7 @@
 # CIFO24
 
 TODO:
+- Compare fitness sharing with version from class
 - Beautiful function for comparison of different configurations
 - Clean and comment all the code, reorganize repo better
 - Create easily understandable documentation in README (main classes and their functionality)

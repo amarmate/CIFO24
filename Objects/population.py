@@ -46,7 +46,9 @@ class Population:
                random_fill : bool = False,
                direction : str = 'rows',
                plateau_threshold : int = 100,
-               verbose : int = 0):
+               verbose : int = 0,
+               normalize_distances : bool = True,
+               invert_distances : bool = False):
         """
         Function to evolve the population
         :param gens: an int representing the number of generations to evolve
@@ -87,7 +89,7 @@ class Population:
             if elite_size > 0:
                 best_individuals = self.get_best_individuals(elite_size)
 
-            self.selection(select_type, diversify)
+            self.selection(select_type, diversify, normalize=normalize_distances, invert_distances=invert_distances)
             self.crossover(type=xo, prob=xo_prob, direction = direction)
             for j in range(len(self.individuals)):
                 self[j] = self[j].mutate(mut_prob, swap_number, mutation=mutation)
@@ -162,7 +164,7 @@ class Population:
                 pass
 
     # TODO too harsh normalization 
-    def get_distances(self, normalize : bool = True):
+    def get_distances(self, normalize : bool = True, invert : bool = False):
         """
         Function to get the distance matrix between individuals, in terms of genotypic distance
         :param normalize: a boolean to normalize the distances
@@ -172,10 +174,18 @@ class Population:
         individuals = np.array([ind.swappable for ind in self.individuals])
         
         # distances = np.sum(cdist(individuals, individuals, 'hamming'), axis=1) 
-        def get_distance(i):
-            diff = individuals[i] != individuals
-            diff[i, :] = False
-            return np.sum(np.sum(diff, axis=1))
+        def get_distance(i, invert=invert):
+            if invert:
+                diff = individuals[i] != individuals
+                diff[i, :] = False
+
+                diff = 1- np.sum(diff, axis=1)/len(individuals[i])
+                diff[i] = 0
+                return 1/np.sum(diff)
+            else:
+                diff = individuals[i] != individuals
+                diff[i, :] = False
+                return np.sum(np.sum(diff, axis=1))
         
         distances = np.array([get_distance(i) for i in range(len(self))]) 
 
@@ -639,22 +649,22 @@ class Population:
 
 
     # ------------------------------------ Selection ------------------------------------------------
-    def selection(self, type : str = 'roulette', diversify : str = None):
+    def selection(self, type : str = 'roulette', diversify : str = None, invert_distances: bool = False, normalize: bool = True):
         """
         Function to select the individuals in the population
         :param type: a string representing the type of selection to apply
         :param diversify: a string representing the type of diversification to apply, choose between 'fitness-sharing' and 'restricted-mating'
         """
         if type == 'roulette':
-            self.roulette(diversify=diversify)
+            self.roulette(diversify=diversify, invert_distances=invert_distances, normalize=normalize)
 
         if type == 'tournament':
-            self.tournament(diversify=diversify)
+            self.tournament(diversify=diversify, invert_distances=invert_distances, normalize=normalize)
 
         if type == 'rank':
             self.rank()
     
-    def roulette(self, diversify : str = None):
+    def roulette(self, diversify : str = None, invert_distances: bool = False, normalize: bool = True):
         """
         Function to apply roulette selection
         :param diversify: a string representing the type of diversification to apply, choose between 'fitness-sharing' and 'restricted-mating'
@@ -665,7 +675,7 @@ class Population:
             fitnesses = [1/(individual.fitness+0.000001) for individual in self.individuals]
         elif diversify == 'fitness-sharing':
             # Get the distances between individuals
-            distances = self.get_distances(normalize=True)
+            distances = self.get_distances(normalize=normalize, invert = invert_distances)
             # The larger the distance, the better the fitness
             fitnesses = [(1/(individual.fitness+0.000001)) * (distances[i]+0.0000001) for i, individual in enumerate(self.individuals)]
         elif diversify == 'restricted-mating':
@@ -684,7 +694,7 @@ class Population:
         self.individuals = np.random.choice(self.individuals, size=self.size, p=probabilities_std, replace=True)
     
 
-    def tournament(self, tournament_size : int = 3, diversify : str = None):
+    def tournament(self, tournament_size : int = 3, diversify : str = None, invert_distances: bool = False, normalize: bool = True):
         """
         Function to apply tournament selection
         :param tournament_size: an int representing the size of the tournament
@@ -699,7 +709,7 @@ class Population:
 
         if diversify == 'fitness-sharing':
             # Get the distances between individuals
-            distances = self.get_distances(normalize=True)
+            distances = self.get_distances(normalize=normalize, invert = invert_distances)
             # The larger the distance, the better the fitness
             fitnesses = fitnesses * distances[:, None]
 
