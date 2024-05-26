@@ -222,6 +222,7 @@ class Population:
         Function to crossover the individuals in the population
         :param type: a string representing the type of crossover to apply
         """
+        assert type in ['single_point','multi_point', 'cycle','special_xo','single_point_tabular', 'row_wise_cycle'], "The type of crossover has to be either'single_point','multi_point', 'cycle','special_xo','single_point_tabular', 'row_wise_cycle'"
         if type != 'special_xo' and random_fill:
             print("Warning! Random fill can only be applied to special crossover.")
 
@@ -239,6 +240,9 @@ class Population:
         
         elif type == 'single_point_tabular':
             self.single_point_tabular(prob, direction=direction)
+
+        elif type == 'row_wise_cycle':
+            self.row_wise_cycle(prob)
 
 
 
@@ -542,6 +546,103 @@ class Population:
                 board[self.individuals[i].swap_points] = swappable
                 # np.putmask(board, self.individuals[i].swap_points, swappable)
                 self.individuals[i] = Sudoku(initial_board=self.individuals[i].initial_board, board=board)
+    
+    def row_wise_cycle(self, prob : float = 0.5, keep_distribution : bool = False):
+        """
+        Function to apply row_wise_cycle crossover
+        """
+        if prob == 0:
+            pass
+        else:
+            population_array = np.array([i.board for i in self.individuals])
+
+            # Get the number of parents and the shape of each parent
+            num_parents = len(self)
+
+            # Sample how many crossovers to do
+            num_crossovers = sum(np.random.choice([0,1], size = int(num_parents/2), replace=True, p=[1-prob, prob]))
+
+            # Select two random parents for each offspring without replacement
+            parent_indices = np.random.choice(num_parents, size=(num_crossovers,2), replace=False)
+
+            offspring = []
+
+            for ind in parent_indices:
+                parent_1 = self.individuals[ind[0]]
+                parent_2 = self.individuals[ind[1]]
+
+                # Full offsprings
+                offspring_1 = []
+                offspring_2 = []
+
+                for i in range(parent_1.N):
+                    parent1 = parent_1.board[i][parent_1.swap_points[i]] # row i of parent_1 on swappable positions
+                    parent2 = parent_2.board[i][parent_2.swap_points[i]] # row i of parent_2 on swappable positions
+                    indicator = True # To know if we need to continue the cycle
+                    current_position = 0
+                    available_indicies = list(np.arange(len(parent1))) # List with the available indicies during the cycle loop
+                    if len(available_indicies) > 0:
+                        while indicator:
+                            available_indicies.remove(current_position) # Remove every visited position
+                            mask = np.zeros(len(parent1))
+                            mask[available_indicies] = True
+                            # Getting possible next positions for the cycle based on the parent2 value on the current position
+                            possible_next_indicies = np.where(mask*parent1 == parent2[current_position])[0] 
+                            if len(possible_next_indicies) == 0:
+                                indicator = False
+                            else:
+                                # If we found a number that is not in parent1, we need to continue the cycle and go to that position
+                                current_position = np.random.choice(possible_next_indicies)
+                        all_indicies = list(np.arange(len(parent1)))
+                        used_indicies = list(set(all_indicies) - set(available_indicies))
+
+                        # Each row of the board
+                        offspring1 = np.zeros(len(parent1), dtype=int)
+                        offspring2 = np.zeros(len(parent1), dtype=int)
+
+
+                        offspring1[available_indicies] = parent2[available_indicies]
+                        offspring1[used_indicies] = parent1[used_indicies]
+                        offspring2[available_indicies] = parent1[available_indicies]
+                        offspring2[used_indicies] = parent2[used_indicies]
+
+                        board_row = deepcopy(parent_1.board[i])
+                        board_row[self.individuals[ind[0]].swap_points[i]] = offspring1
+                        offspring_1.append(board_row)
+
+                        board_row = deepcopy(parent_2.board[i])
+                        board_row[self.individuals[ind[0]].swap_points[i]] = offspring2
+                        offspring_2.append(board_row)
+                    else:
+                        offspring_1.append(parent_1.board[i])
+                        offspring_2.append(parent_2.board[i])
+                
+                offspring.append(np.array(offspring_1))
+                offspring.append(np.array(offspring_2))
+            
+            offspring = np.array(offspring)
+            # Put parents that didn't get crossovered back into the population
+            if num_crossovers < num_parents:
+                left_ind = np.setdiff1d(np.arange(num_parents), parent_indices.flatten())
+                offspring = np.concatenate((offspring, population_array[left_ind]))
+
+
+            # Append random offsprings from parents until we reach population size
+            if offspring.shape[0] < num_parents:
+                while offspring.shape[0] < num_parents:
+                    offspring = np.append(offspring, 
+                                        np.expand_dims(population_array[np.random.choice(len(population_array))], axis=0), axis = 0)
+                    
+            if keep_distribution:
+                perfect_distribution = np.tile(self.individuals[0].distribution, len(offspring))
+                real_distribution = np.apply_along_axis(lambda row: np.bincount(row, minlength=10), axis=1, arr=offspring)
+                difference = perfect_distribution - real_distribution
+
+            
+            # Put the offsprings into the population
+            for i in range(len(self)):
+                self.individuals[i] = Sudoku(initial_board=self.individuals[i].initial_board, board=offspring[i])
+            
 
     def single_point_tabular(self, prob : float = 0.5, direction : str = 'rows', keep_distribution : bool = False):
         """
