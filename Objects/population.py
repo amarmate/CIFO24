@@ -94,7 +94,7 @@ class Population:
             self.selection(select_type, diversify, normalize=normalize_distances, invert_distances=invert_distances)
             self.crossover(type=xo, prob=xo_prob, direction = direction)
             for j in range(len(self.individuals)):
-                self[j] = self[j].mutate(mut_prob, swap_number, mutation=mutation)
+                self[j] = self[j].mutate(mut_prob, swap_number, mutation=mutation, verbose=verbose)
 
             if keep_distribution:
                 self.keep_distribution()

@@ -174,7 +174,7 @@ class Sudoku:
         return neighbours
     
     
-    def mutate(self, mut_prob : float, n_changes : int = 1, mutation : str = 'swap'): 
+    def mutate(self, mut_prob : float, n_changes : int = 1, mutation : str = 'swap', verbose : int = 0): 
         """
         Function to mutate the individual, i.e. change the board randomly, by changing n_changes numbers in the board
         :param mut_prob: a float representing the probability of mutation
@@ -210,7 +210,8 @@ class Sudoku:
                 try: 
                     infrequent_numbers = get_infrequent_numbers(neighbour, self.swappable_positions[i])
                 except:
-                    print(f'Warning: Couldnt finish the smart mutation (only {changes}/{n_changes} done). Returning the individual with simple change mutation.')
+                    if verbose > 0:
+                        print(f'Warning: Couldnt finish the smart mutation (only {changes}/{n_changes} done). Returning the individual with simple change mutation.')
                     new_individual = Sudoku(self.initial_board, neighbour)
                     return new_individual.mutate(mut_prob, n_changes - changes, mutation='change')
                 
