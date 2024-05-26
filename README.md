@@ -5,7 +5,7 @@ TODO:
 - Beautiful function for comparison of different configurations - DONE( standard way for experimentation in a separte nb)
 - Clean and comment all the code, reorganize repo better - (Only cleaned and organized population for now)
 - Create easily understandable documentation in README (main classes and their functionality)
-- Run different comparisons (differentmut/xo/selction, different mut and xo rates, different elite size, different sudoku difficulties, population_size) - Not fully done^ but running
+- Run different comparisons (differentmut/xo/selction, different mut and xo rates, different elite size, different sudoku difficulties, population_size) - Not fully done^ but running - added one new crossover need to rerun everything again
 - Make visualisations and statistical tests
 
 1) (REWRITE) Individual will have multiple properties:
