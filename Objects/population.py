@@ -223,6 +223,7 @@ class Population:
         :param type: a string representing the type of crossover to apply
         """
         assert type in ['single_point','multi_point', 'cycle','special_xo','single_point_tabular', 'row_wise_cycle'], "The type of crossover has to be either'single_point','multi_point', 'cycle','special_xo','single_point_tabular', 'row_wise_cycle'"
+        
         if type != 'special_xo' and random_fill:
             print("Warning! Random fill can only be applied to special crossover.")
 
@@ -465,9 +466,9 @@ class Population:
 
         1. Getting possible next positions for the cycle based on the parent2 value on the current position in parent1
         2. For example, we have number 7 there for next step and there are 3 sevens in parent1 on positions 3,4,5
-        3. We pick one position randomly, foe example, position 4
+        3. We pick one position randomly, for example, position 4
         4. Remove position 4 from list of possible positions
-        4. Then go to the position 4 and repeat such moves until we find a number that is not in parent1
+        5. Then go to the position 4 and repeat such moves until we find a number that is not in parent1
         """
 
         if prob == 0:
@@ -746,14 +747,13 @@ class Population:
         :param type: a string representing the type of selection to apply
         :param diversify: a string representing the type of diversification to apply, choose between 'fitness-sharing' and 'restricted-mating'
         """
+        assert type in ['roulette', 'tournament'], "Invalid selection type"
         if type == 'roulette':
             self.roulette(diversify=diversify, invert_distances=invert_distances, normalize=normalize)
 
         if type == 'tournament':
             self.tournament(diversify=diversify, invert_distances=invert_distances, normalize=normalize)
 
-        if type == 'rank':
-            self.rank()
     
     def roulette(self, diversify : str = None, invert_distances: bool = False, normalize: bool = True):
         """
@@ -769,8 +769,6 @@ class Population:
             distances = self.get_distances(normalize=normalize, invert = invert_distances)
             # The larger the distance, the better the fitness
             fitnesses = [(1/(individual.fitness+0.000001)) * (distances[i]+0.0000001) for i, individual in enumerate(self.individuals)]
-        elif diversify == 'restricted-mating':
-            fitnesses = []
         
         total_fitness = sum(fitnesses)
         probabilities = [fitness / total_fitness for fitness in fitnesses]

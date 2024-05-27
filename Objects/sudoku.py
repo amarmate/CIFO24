@@ -113,27 +113,44 @@ class Sudoku:
         Function to fill in the empty cells (0s) in the board, ensuring that the board is still valid, i.e. no more that 9 of the same number in the board
         :param mode: a string representing how to fill the board. Can be 'random' or 'logic-random'
         """
-        assert mode in ['random', 'logic-random'], "The mode has to be 'random' or 'logic-random'"
+        assert mode in ['random', 'logic-random', 'row_wise'], "The mode has to be 'random', 'logic-random' or 'row_wise'" 
 
         if mode == 'logic-random':
             self.fill_board_logic()
-                
-        # Randomly fill-in the rest of the board
-        flat_board = self.initial_board.copy().flatten()
 
-        # Get how many of each number is still missing from the board
-        number_counts = np.bincount(flat_board, minlength=self.N + 1)
-        fill_number_count = self.N - number_counts[1:]
 
-        # Create an array of the numbers to fill in the board and shuffle
-        fill_numbers = np.repeat(np.arange(1, self.N + 1), fill_number_count)
-        np.random.shuffle(fill_numbers)
+        if mode == 'row_wise':
+            self.fill_board_row_wise()
 
-        # Fill in the board
-        # np.putmask(flat_board, flat_board == 0, fill_numbers)
-        flat_board[np.where(flat_board == 0)] = fill_numbers
-        self.board = flat_board.reshape(self.N, self.N)
+        if mode == 'random':
+            # Randomly fill-in the rest of the board
+            flat_board = self.initial_board.copy().flatten()
 
+            # Get how many of each number is still missing from the board
+            number_counts = np.bincount(flat_board, minlength=self.N + 1)
+            fill_number_count = self.N - number_counts[1:]
+
+            # Create an array of the numbers to fill in the board and shuffle
+            fill_numbers = np.repeat(np.arange(1, self.N + 1), fill_number_count)
+            np.random.shuffle(fill_numbers)
+
+            # Fill in the board
+            # np.putmask(flat_board, flat_board == 0, fill_numbers)
+            flat_board[np.where(flat_board == 0)] = fill_numbers
+            self.board = flat_board.reshape(self.N, self.N)
+    
+    def fill_board_row_wise(self):
+        """
+        Method to fill the board by filling each row with missing numbers
+        """
+
+        board = deepcopy(self.initial_board)
+        for i in range(self.N): # go row wise
+            fill_numbers = list(set(np.arange(1,10)) - set(self.initial_board[i]))
+            np.random.shuffle(fill_numbers)
+            board[i][np.where(board[i] == 0)] = fill_numbers
+
+        self.board = board
 
     def fill_board_logic(self):
         """
@@ -188,6 +205,24 @@ class Sudoku:
         elif mutation == 'swap-smart':
             return self.get_neighbours(number_of_neighbours=1, swap_number=n_changes, smart=True)[0] if np.random.rand() < mut_prob else self
         
+        elif mutation == 'swap-row': # Swapping elements inside one random row
+            if np.random.rand() > mut_prob:
+                return self
+            else:
+                rand_row = np.random.randint(0, self.N)
+                row_swappables = self.board.copy()[rand_row][self.swap_points[rand_row]]
+
+                if len(row_swappables) >= n_changes*2:
+                    permute = np.random.choice(np.arange(len(row_swappables)), size = (n_changes,2), replace=False)
+                    for i in permute:
+                        row_swappables[i[0]] , row_swappables[i[1]] = row_swappables[i[1]], row_swappables[i[0]]
+                    
+                    self.board[rand_row][self.swap_points[rand_row]] = row_swappables
+                else:
+                    if verbose > 0:
+                        print(f"Amount of swappables: {len(row_swappables)}, n_changes: {n_changes}. Skipping mutation, as the is not enough swappables")
+                
+                return self
         elif mutation == 'change':
             if np.random.rand() > mut_prob:
                 return self
@@ -195,7 +230,7 @@ class Sudoku:
             np.random.shuffle(self.swappable_positions)
             for i in range(n_changes):
                 new_number = np.random.randint(1, self.N + 1)
-                # Randomly select two swappeable positions 
+                # Randomly select two swappable positions 
                 neighbour[self.swappable_positions[i]] = new_number                 
             return Sudoku(self.initial_board, neighbour)
         
