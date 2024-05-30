@@ -306,7 +306,7 @@ class Population:
             for i in range(len(self)):
                 swappable = offspring[i]
                 board = deepcopy(self.individuals[i].board)
-                np.putmask(board, self.individuals[i].swap_points, swappable)
+                board[self.individuals[i].swap_points] = swappable
                 self.individuals[i] = Sudoku(initial_board=self.individuals[i].initial_board, board=board)
 
 
@@ -387,7 +387,7 @@ class Population:
             for i in range(len(self)):
                 swappable = offspring[i]
                 board = deepcopy(self.individuals[i].board)
-                np.putmask(board, self.individuals[i].swap_points, swappable)
+                board[self.individuals[i].swap_points] = swappable
                 self.individuals[i] = Sudoku(initial_board=self.individuals[i].initial_board, board=board)
 
     def special_xo(self, prob : float = 0.5, random_fill : bool = False):
